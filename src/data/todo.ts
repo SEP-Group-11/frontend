@@ -20,6 +20,7 @@ export interface TodoItem {
   status: TodoItemStatus;
   description?: string | null;
   due?: string | null;
+  parent?: string | null;
 }
 
 export const enum TodoListEntityFeature {

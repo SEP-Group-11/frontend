@@ -345,6 +345,7 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
                 draggable: item.status === TodoItemStatus.NeedsAction,
                 completed: item.status === TodoItemStatus.Completed,
                 multiline: Boolean(item.description || item.due),
+                subitem: Boolean(item.parent),
               })}"
               .selected=${item.status === TodoItemStatus.Completed}
               .disabled=${unavailable ||
@@ -645,6 +646,10 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
 
       .item {
         margin-top: 8px;
+      }
+
+      .subitem {
+        margin-left: 24px;
       }
 
       ha-check-list-item {
