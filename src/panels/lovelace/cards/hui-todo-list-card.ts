@@ -8,6 +8,7 @@ import {
   mdiDrag,
   mdiPlus,
   mdiSort,
+  mdiSubdirectoryArrowRight,
 } from "@mdi/js";
 import { endOfDay, isSameDay } from "date-fns";
 import type { UnsubscribeFunc } from "home-assistant-js-websocket";
@@ -340,7 +341,7 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
           return html`
             <ha-check-list-item
               left
-              .hasMeta=${showReorder || showDelete}
+              .hasMeta=${true /* TODO: replace with correct conditional */}
               class="editRow ${classMap({
                 draggable: item.status === TodoItemStatus.NeedsAction,
                 completed: item.status === TodoItemStatus.Completed,
@@ -381,6 +382,29 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
                     </div>`
                   : nothing}
               </div>
+              <ha-button-menu
+                @closed=${stopPropagation}
+                slot="meta"
+                ?fixed=${true}
+              >
+                <ha-icon-button
+                  slot="trigger"
+                  .path=${mdiDotsVertical}
+                ></ha-icon-button>
+                <ha-list-item
+                  @click=${this._addSubItem}
+                  graphic="icon"
+                  .itemId=${item.uid}
+                >
+                  Add sub item
+                  <ha-svg-icon
+                    slot="graphic"
+                    .path=${mdiSubdirectoryArrowRight}
+                    .disabled=${unavailable}
+                  >
+                  </ha-svg-icon>
+                </ha-list-item>
+              </ha-button-menu>
               ${showReorder
                 ? html`
                     <ha-svg-icon
@@ -521,6 +545,12 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
 
   private get _newItem(): HaTextField {
     return this.shadowRoot!.querySelector(".addBox") as HaTextField;
+  }
+
+  private _addSubItem(ev): void {
+    ev.stopPropagation();
+    const parentId = ev.currentTarget.itemId;
+    showTodoItemEditDialog(this, { entity: this._entityId!, parent: parentId });
   }
 
   private _addItem(ev): void {

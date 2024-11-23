@@ -15,6 +15,7 @@ export const enum TodoItemStatus {
 }
 
 export interface TodoItem {
+  parent?: string;
   uid: string;
   summary: string;
   status: TodoItemStatus;
@@ -103,6 +104,7 @@ export const createItem = (
     "todo",
     "add_item",
     {
+      parent: item.parent,
       item: item.summary,
       description: item.description || undefined,
       due_datetime: item.due?.includes("T") ? item.due : undefined,
