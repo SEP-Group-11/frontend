@@ -346,7 +346,9 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
                 draggable: item.status === TodoItemStatus.NeedsAction,
                 completed: item.status === TodoItemStatus.Completed,
                 multiline: Boolean(item.description || item.due),
-                subitem: Boolean(item.parent),
+                subitem:
+                  Boolean(item.parent) &&
+                  item.status === TodoItemStatus.NeedsAction,
               })}"
               .selected=${item.status === TodoItemStatus.Completed}
               .disabled=${unavailable ||
