@@ -108,7 +108,7 @@ class DialogTodoItemEditor extends LitElement {
         .heading=${createCloseHeading(
           this.hass, // TODO: localization
           this._params.parent
-            ? "Add subtask"
+            ? this.hass.localize("ui.panel.todo.add_subtask")
             : this.hass.localize(
                 `ui.components.todo.item.${isCreate ? "add" : "edit"}`
               )
