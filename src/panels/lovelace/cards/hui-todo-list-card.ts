@@ -273,6 +273,12 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
               graphic="icon"
               .activated=${this._sortKey == null}
             >
+              <ha-svg-icon
+                slot="graphic"
+                .path=${mdiSort}
+                .disabled=${unavailable}
+              >
+              </ha-svg-icon>
               ${this.hass!.localize(
                 "ui.panel.lovelace.cards.todo-list.sort_by_none"
               )}
