@@ -1,3 +1,5 @@
+/* eslint-disable no-console */
+/* eslint-disable lit/no-template-arrow */
 import "@material/mwc-list/mwc-list";
 import type { List } from "@material/mwc-list/mwc-list";
 import {
@@ -87,6 +89,8 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
   @state() private _reordering = false;
 
   private _unsubItems?: Promise<UnsubscribeFunc>;
+
+  private _draggedItem: TodoItem | null = null;
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -344,74 +348,86 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
           const today =
             due && !item.due!.includes("T") && isSameDay(new Date(), due);
           return html`
-            <ha-check-list-item
-              left
-              .hasMeta=${showReorder || showDelete}
-              class="editRow ${classMap({
-                draggable: item.status === TodoItemStatus.NeedsAction,
-                completed: item.status === TodoItemStatus.Completed,
-                multiline: Boolean(item.description || item.due),
-              })}"
-              .selected=${item.status === TodoItemStatus.Completed}
-              .disabled=${unavailable ||
-              !this.todoListSupportsFeature(
-                TodoListEntityFeature.UPDATE_TODO_ITEM
-              )}
+            <div
+              class="todo-item"
               item-id=${item.uid}
-              .itemId=${item.uid}
-              @change=${this._completeItem}
-              @click=${this._openItem}
-              @request-selected=${this._requestSelected}
-              @keydown=${this._handleKeydown}
+              draggable="true"
+              @dragstart=${(e: DragEvent) => this._handleDragStart(e, item)}
+              @dragover=${this._handleDragOver}
+              @drop=${this._handleDrop}
+              @dragend=${this._handleDragEnd}
             >
-              <div class="column">
-                <span class="summary">${item.summary}</span>
-                ${item.description
-                  ? html`<ha-markdown-element
-                      class="description"
-                      .content=${item.description}
-                    ></ha-markdown-element>`
-                  : nothing}
-                ${due
-                  ? html`<div class="due ${due < new Date() ? "overdue" : ""}">
-                      <ha-svg-icon .path=${mdiClock}></ha-svg-icon>${today
-                        ? this.hass!.localize(
-                            "ui.panel.lovelace.cards.todo-list.today"
-                          )
-                        : html`<ha-relative-time
-                            capitalize
-                            .hass=${this.hass}
-                            .datetime=${due}
-                          ></ha-relative-time>`}
-                    </div>`
-                  : nothing}
-              </div>
-              ${showReorder
-                ? html`
-                    <ha-svg-icon
-                      .title=${this.hass!.localize(
-                        "ui.panel.lovelace.cards.todo-list.drag_and_drop"
-                      )}
-                      class="reorderButton handle"
-                      .path=${mdiDrag}
-                      slot="meta"
-                    >
-                    </ha-svg-icon>
-                  `
-                : showDelete
-                  ? html`<ha-icon-button
-                      .title=${this.hass!.localize(
-                        "ui.panel.lovelace.cards.todo-list.delete_item"
-                      )}
-                      class="deleteItemButton"
-                      .path=${mdiDelete}
-                      .itemId=${item.uid}
-                      slot="meta"
-                      @click=${this._deleteItem}
-                    >
-                    </ha-icon-button>`
-                  : nothing}
-            </ha-check-list-item>
+              <ha-check-list-item
+                left
+                .hasMeta=${showReorder || showDelete}
+                class="editRow ${classMap({
+                  draggable: item.status === TodoItemStatus.NeedsAction,
+                  completed: item.status === TodoItemStatus.Completed,
+                  multiline: Boolean(item.description || item.due),
+                })}"
+                .selected=${item.status === TodoItemStatus.Completed}
+                .disabled=${unavailable ||
+                !this.todoListSupportsFeature(
+                  TodoListEntityFeature.UPDATE_TODO_ITEM
+                )}
+                item-id=${item.uid}
+                .itemId=${item.uid}
+                @change=${this._completeItem}
+                @click=${this._openItem}
+                @request-selected=${this._requestSelected}
+                @keydown=${this._handleKeydown}
+              >
+                <div class="column">
+                  <span class="summary">${item.summary}</span>
+                  ${item.description
+                    ? html`<ha-markdown-element
+                        class="description"
+                        .content=${item.description}
+                      ></ha-markdown-element>`
+                    : nothing}
+                  ${due
+                    ? html`<div
+                        class="due ${due < new Date() ? "overdue" : ""}"
+                      >
+                        <ha-svg-icon .path=${mdiClock}></ha-svg-icon>${today
+                          ? this.hass!.localize(
+                              "ui.panel.lovelace.cards.todo-list.today"
+                            )
+                          : html`<ha-relative-time
+                              capitalize
+                              .hass=${this.hass}
+                              .datetime=${due}
+                            ></ha-relative-time>`}
+                      </div>`
+                    : nothing}
+                </div>
+                ${showReorder
+                  ? html`
+                      <ha-svg-icon
+                        .title=${this.hass!.localize(
+                          "ui.panel.lovelace.cards.todo-list.drag_and_drop"
+                        )}
+                        class="reorderButton handle"
+                        .path=${mdiDrag}
+                        slot="meta"
+                      >
+                      </ha-svg-icon>
+                    `
+                  : showDelete
+                    ? html`<ha-icon-button
+                        .title=${this.hass!.localize(
+                          "ui.panel.lovelace.cards.todo-list.delete_item"
+                        )}
+                        class="deleteItemButton"
+                        .path=${mdiDelete}
+                        .itemId=${item.uid}
+                        slot="meta"
+                        @click=${this._deleteItem}
+                      >
+                      </ha-icon-button>`
+                    : nothing}
+              </ha-check-list-item>
+            </div>
           `;
         }
       )}
@@ -595,6 +611,68 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
     this._items = [...this._items!];
 
     await moveItem(this.hass!, this._entityId!, item.uid, prevItem?.uid);
+  }
+
+  private _handleDragStart(e: DragEvent, _item: TodoItem) {
+    const itemId = (e.currentTarget as HTMLElement).getAttribute("item-id");
+    const draggedItem = this._getItem(itemId!);
+    if (draggedItem) {
+      // Log the drag start event and item details
+      console.log("Drag start:", draggedItem);
+      e.dataTransfer?.setData("text/plain", draggedItem.uid);
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = "move";
+      }
+      this._draggedItem = draggedItem;
+    }
+  }
+
+  private _handleDragOver(e: DragEvent) {
+    // Log the drag over event
+    console.log("Drag over");
+    e.preventDefault();
+    e.dataTransfer!.dropEffect = "move";
+  }
+
+  private _handleDrop(e: DragEvent) {
+    // Log the drop event and dragged item details
+    console.log("Drop event:", this._draggedItem);
+    e.preventDefault();
+    const uid = e.dataTransfer?.getData("text/plain");
+    if (uid && this._draggedItem) {
+      const panelTodo = document.querySelector("ha-panel-todo") as any;
+      if (panelTodo) {
+        // Log the deletion of the item from the current list
+        console.log(
+          "Deleting item from list:",
+          this._draggedItem.uid,
+          this._entityId
+        );
+        panelTodo._deleteItemFromList(this._draggedItem.uid, this._entityId);
+        // Log the addition of the item to the target list
+        console.log("Adding item to target list:", uid, this._entityId);
+        panelTodo._addItemToTargetList(uid, this._entityId);
+      } else {
+        // Log if the ha-panel-todo element is not found
+        console.error("ha-panel-todo element not found");
+      }
+    } else {
+      // Log if the uid or _draggedItem is null
+      console.error(
+        "Drop event: uid or _draggedItem is null",
+        uid,
+        this._draggedItem
+      );
+    }
+    // Ensure _draggedItem is set to null after handling the drop event
+    this._draggedItem = null;
+  }
+
+  private _handleDragEnd() {
+    // Log the drag end event
+    console.log("Drag end");
+    // Ensure _draggedItem is set to null after handling the drop event
+    // this._draggedItem = null;
   }
 
   static get styles(): CSSResultGroup {

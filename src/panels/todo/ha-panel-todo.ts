@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { ResizeController } from "@lit-labs/observers/resize-controller";
 import "@material/mwc-list";
 import {
@@ -362,13 +363,13 @@ class PanelTodo extends LitElement {
                 <div class="column all-lists-display">
                   ${getTodoLists(this.hass).map(
                     (list) => html`
-                        <div class="list-name">${list.name}</div>
-                        <hui-card
-                          .hass=${this.hass}
-                          .config=${this._cardConfig(list.entity_id)}
-                        ></hui-card>
-                      `
-                    )}
+                      <div class="list-name">${list.name}</div>
+                      <hui-card
+                        .hass=${this.hass}
+                        .config=${this._cardConfig(list.entity_id)}
+                      ></hui-card>
+                    `
+                  )}
                 </div>
               </div>
             `
@@ -464,6 +465,51 @@ class PanelTodo extends LitElement {
 
   private _addItem() {
     showTodoItemEditDialog(this, { entity: this._entityId! });
+  }
+
+  private _addItemToTargetList(uid: string, targetListId: string) {
+    // Log the addition of the item to the target list
+    console.log(
+      "Adding item to target list in ha-panel-todo:",
+      uid,
+      targetListId
+    );
+    const targetList = this._allTasks[targetListId];
+    const item = this._findItemByUid(uid);
+    if (item) {
+      targetList.push(item);
+      this.requestUpdate();
+    } else {
+      // Log if the item is not found
+      console.error("Item not found:", uid);
+    }
+  }
+
+  private _findItemByUid(uid: string): TodoItem | undefined {
+    for (const listId in this._allTasks) {
+      if (Object.prototype.hasOwnProperty.call(this._allTasks, listId)) {
+        const list = this._allTasks[listId];
+        const item = list.find((task) => task.uid === uid);
+        if (item) {
+          return item;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  private _deleteItemFromList(uid: string, listId: string) {
+    // Log the deletion of the item from the list
+    console.log("Deleting item from list in ha-panel-todo:", uid, listId);
+    const list = this._allTasks[listId];
+    const index = list.findIndex((task) => task.uid === uid);
+    if (index !== -1) {
+      list.splice(index, 1);
+      this.requestUpdate();
+    } else {
+      // Log if the item is not found in the list
+      console.error("Item not found in list:", uid, listId);
+    }
   }
 
   static get styles(): CSSResultGroup {
