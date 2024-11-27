@@ -355,7 +355,14 @@ class PanelTodo extends LitElement {
     if (entityRegistryEntry.platform === "local_todo") {
       result = await deleteConfigEntry(this.hass, entryId);
     } else if (entityRegistryEntry.platform === "google_tasks") {
-      result = await deleteTodoList(this.hass, this._entityId);
+      try {
+        result = await deleteTodoList(this.hass, this._entityId);
+      } catch (err) {
+        showAlertDialog(this, {
+          text: "Cannot delete default Google Tasks list",
+        });
+        return;
+      }
     }
 
     this._entityId = getTodoLists(this.hass)[0]?.entity_id;
