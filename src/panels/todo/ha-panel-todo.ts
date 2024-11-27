@@ -41,6 +41,8 @@ import {
   TodoListEntityFeature,
   getTodoLists,
   fetchItems,
+  createItem,
+  deleteItems,
 } from "../../data/todo";
 import type { TodoItem } from "../../data/todo";
 import { showConfigFlowDialog } from "../../dialogs/config-flow/show-dialog-config-flow";
@@ -467,24 +469,6 @@ class PanelTodo extends LitElement {
     showTodoItemEditDialog(this, { entity: this._entityId! });
   }
 
-  private _addItemToTargetList(uid: string, targetListId: string) {
-    // Log the addition of the item to the target list
-    console.log(
-      "Adding item to target list in ha-panel-todo:",
-      uid,
-      targetListId
-    );
-    const targetList = this._allTasks[targetListId];
-    const item = this._findItemByUid(uid);
-    if (item) {
-      targetList.push(item);
-      this.requestUpdate();
-    } else {
-      // Log if the item is not found
-      console.error("Item not found:", uid);
-    }
-  }
-
   private _findItemByUid(uid: string): TodoItem | undefined {
     for (const listId in this._allTasks) {
       if (Object.prototype.hasOwnProperty.call(this._allTasks, listId)) {
@@ -498,17 +482,43 @@ class PanelTodo extends LitElement {
     return undefined;
   }
 
-  private _deleteItemFromList(uid: string, listId: string) {
+  public async _addItemToTargetList(uid: string, targetListId: string) {
+    // Log the addition of the item to the target list
+    console.log(
+      "Adding item to target list in ha-panel-todo:",
+      uid,
+      targetListId
+    );
+    const item = this._findItemByUid(uid);
+    if (item) {
+      try {
+        await createItem(this.hass, targetListId, {
+          summary: item.summary,
+          description: item.description || undefined,
+          due: item.due || undefined,
+        });
+        // Fetch the updated tasks
+        await this._fetchAllTasks();
+        console.log("Item added to target list:", uid, targetListId);
+      } catch (error) {
+        console.error("Error adding item to target list:", error);
+      }
+    } else {
+      // Log if the item is not found
+      console.error("Item not found:", uid);
+    }
+  }
+
+  public async _deleteItemFromList(uid: string, listId: string) {
     // Log the deletion of the item from the list
     console.log("Deleting item from list in ha-panel-todo:", uid, listId);
-    const list = this._allTasks[listId];
-    const index = list.findIndex((task) => task.uid === uid);
-    if (index !== -1) {
-      list.splice(index, 1);
-      this.requestUpdate();
-    } else {
-      // Log if the item is not found in the list
-      console.error("Item not found in list:", uid, listId);
+    try {
+      await deleteItems(this.hass, listId, [uid]);
+      // Fetch the updated tasks
+      await this._fetchAllTasks();
+      console.log("Item deleted from list:", uid, listId);
+    } catch (error) {
+      console.error("Error deleting item from list:", error);
     }
   }
 

@@ -52,6 +52,9 @@ import { findEntities } from "../common/find-entities";
 import { createEntityNotFoundWarning } from "../components/hui-warning";
 import type { LovelaceCard, LovelaceCardEditor } from "../types";
 import type { TodoListCardConfig } from "./types";
+// import { dragged } from "sortablejs";
+
+let globalDraggedItem: TodoItem | null = null;
 
 @customElement("hui-todo-list-card")
 export class HuiTodoListCard extends LitElement implements LovelaceCard {
@@ -624,48 +627,75 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
         e.dataTransfer.effectAllowed = "move";
       }
       this._draggedItem = draggedItem;
+      globalDraggedItem = draggedItem;
+      console.log("this.Dragged item:", this._draggedItem, globalDraggedItem);
     }
   }
 
   private _handleDragOver(e: DragEvent) {
     // Log the drag over event
-    console.log("Drag over");
+    console.log("Drag over:", this._draggedItem, globalDraggedItem);
     e.preventDefault();
     e.dataTransfer!.dropEffect = "move";
   }
 
   private _handleDrop(e: DragEvent) {
     // Log the drop event and dragged item details
-    console.log("Drop event:", this._draggedItem);
+    console.log("Drop event, globalDraggedItem:", globalDraggedItem);
     e.preventDefault();
     const uid = e.dataTransfer?.getData("text/plain");
-    if (uid && this._draggedItem) {
-      const panelTodo = document.querySelector("ha-panel-todo") as any;
-      if (panelTodo) {
-        // Log the deletion of the item from the current list
-        console.log(
-          "Deleting item from list:",
-          this._draggedItem.uid,
-          this._entityId
-        );
-        panelTodo._deleteItemFromList(this._draggedItem.uid, this._entityId);
-        // Log the addition of the item to the target list
-        console.log("Adding item to target list:", uid, this._entityId);
-        panelTodo._addItemToTargetList(uid, this._entityId);
-      } else {
+    if (uid && globalDraggedItem) {
+      // Try to access the ha-panel-todo element
+      // let panelTodo = document.querySelector("ha-panel-todo") as any;
+
+      const homeAssistant = document.querySelector("home-assistant");
+      let panelTodo =
+        homeAssistant?.shadowRoot?.children[0]?.shadowRoot?.children[0]?.children[1]?.querySelector(
+          "ha-panel-todo"
+        ) as any;
+      console.log(panelTodo);
+      if (!panelTodo) {
         // Log if the ha-panel-todo element is not found
-        console.error("ha-panel-todo element not found");
+        console.error(
+          "ha-panel-todo element not found, trying to access parent element"
+        );
+        // Try to access the parent element if known
+        const parentElement = this.closest("ha-panel-todo") as any;
+        if (parentElement) {
+          panelTodo = parentElement;
+        }
+      }
+      if (panelTodo) {
+        // Log the current entity ID
+        console.log("Current entity ID:", this._entityId);
+        if (this._entityId) {
+          // Log the addition of the item to the target list'
+          console.log("Adding item to target list:", uid, this._entityId);
+          panelTodo._addItemToTargetList(uid, this._entityId);
+          // Log the deletion of the item from the current list
+          console.log(
+            "Deleting item from list:",
+            globalDraggedItem.uid,
+            this._entityId
+          );
+          panelTodo._deleteItemFromList(globalDraggedItem.uid, this._entityId);
+        } else {
+          console.error("Entity ID is undefined");
+        }
+      } else {
+        // Log if the ha-panel-todo element is still not found
+        console.error("ha-panel-todo element still not found after fallback");
       }
     } else {
-      // Log if the uid or _draggedItem is null
+      // Log if the uid or globalDraggedItem is null
       console.error(
-        "Drop event: uid or _draggedItem is null",
+        "Drop event: uid or globalDraggedItem is null",
         uid,
-        this._draggedItem
+        globalDraggedItem
       );
     }
-    // Ensure _draggedItem is set to null after handling the drop event
-    this._draggedItem = null;
+    // Ensure globalDraggedItem is set to null after handling the drop event
+    globalDraggedItem = null;
   }
 
   private _handleDragEnd() {
