@@ -46,6 +46,12 @@ export const getTodoLists = (hass: HomeAssistant): TodoList[] =>
     }))
     .sort((a, b) => stringCompare(a.name, b.name, hass.locale.language));
 
+export const deleteTodoList = (
+  hass: HomeAssistant,
+  entity_id: string
+): Promise<ServiceCallResponse> =>
+  hass.callService("todo", "remove_list", { item: entity_id }, { entity_id });
+
 export interface TodoItems {
   items: TodoItem[];
 }
