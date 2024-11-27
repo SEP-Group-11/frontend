@@ -408,29 +408,31 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
                       @click=${this._deleteItem}
                     >
                     </ha-icon-button>`
-                  : html`<ha-button-menu
-                      @closed=${stopPropagation}
-                      slot="meta"
-                      ?fixed=${true}
-                    >
-                      <ha-icon-button
-                        slot="trigger"
-                        .path=${mdiDotsVertical}
-                      ></ha-icon-button>
-                      <ha-list-item
-                        @click=${this._addSubItem}
-                        graphic="icon"
-                        .itemId=${item.uid}
+                  : !item.parent
+                    ? html`<ha-button-menu
+                        @closed=${stopPropagation}
+                        slot="meta"
+                        ?fixed=${true}
                       >
-                        Add sub item
-                        <ha-svg-icon
-                          slot="graphic"
-                          .path=${mdiSubdirectoryArrowRight}
-                          .disabled=${unavailable}
+                        <ha-icon-button
+                          slot="trigger"
+                          .path=${mdiDotsVertical}
+                        ></ha-icon-button>
+                        <ha-list-item
+                          @click=${this._addSubItem}
+                          graphic="icon"
+                          .itemId=${item.uid}
                         >
-                        </ha-svg-icon>
-                      </ha-list-item>
-                    </ha-button-menu>`}
+                          Add sub item
+                          <ha-svg-icon
+                            slot="graphic"
+                            .path=${mdiSubdirectoryArrowRight}
+                            .disabled=${unavailable}
+                          >
+                          </ha-svg-icon>
+                        </ha-list-item>
+                      </ha-button-menu>`
+                    : nothing}
             </ha-check-list-item>
           `;
         }
