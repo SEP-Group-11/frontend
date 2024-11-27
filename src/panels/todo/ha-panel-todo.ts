@@ -35,7 +35,11 @@ import { deleteConfigEntry } from "../../data/config_entries";
 import { getExtendedEntityRegistryEntry } from "../../data/entity_registry";
 import { fetchIntegrationManifest } from "../../data/integration";
 import type { LovelaceCardConfig } from "../../data/lovelace/config/card";
-import { TodoListEntityFeature, getTodoLists } from "../../data/todo";
+import {
+  TodoListEntityFeature,
+  deleteTodoList,
+  getTodoLists,
+} from "../../data/todo";
 import { showConfigFlowDialog } from "../../dialogs/config-flow/show-dialog-config-flow";
 import {
   showAlertDialog,
@@ -147,7 +151,8 @@ class PanelTodo extends LitElement {
       ? this.hass.states[this._entityId]
       : undefined;
     const showPane = this._showPaneController.value ?? !this.narrow;
-    const listItems = getTodoLists(this.hass).map(
+    const lists = getTodoLists(this.hass);
+    const listItems = lists.map(
       (list) =>
         html`<ha-list-item
           graphic="icon"
@@ -243,7 +248,8 @@ class PanelTodo extends LitElement {
             </ha-svg-icon>
             ${this.hass.localize("ui.panel.todo.assist")}
           </ha-list-item>
-          ${entityRegistryEntry?.platform === "local_todo"
+          ${entityRegistryEntry?.platform === "local_todo" ||
+          entityRegistryEntry?.platform === "google_tasks"
             ? html` <li divider role="separator"></li>
                 <ha-list-item
                   graphic="icon"
@@ -316,12 +322,14 @@ class PanelTodo extends LitElement {
       this._entityId
     );
 
-    if (entityRegistryEntry.platform !== "local_todo") {
+    if (
+      entityRegistryEntry.platform !== "local_todo" &&
+      entityRegistryEntry.platform !== "google_tasks"
+    ) {
       return;
     }
 
     const entryId = entityRegistryEntry.config_entry_id;
-
     if (!entryId) {
       return;
     }
@@ -342,7 +350,20 @@ class PanelTodo extends LitElement {
     if (!confirmed) {
       return;
     }
-    const result = await deleteConfigEntry(this.hass, entryId);
+
+    let result;
+    if (entityRegistryEntry.platform === "local_todo") {
+      result = await deleteConfigEntry(this.hass, entryId);
+    } else if (entityRegistryEntry.platform === "google_tasks") {
+      try {
+        result = await deleteTodoList(this.hass, this._entityId);
+      } catch (err) {
+        showAlertDialog(this, {
+          text: "Cannot delete default Google Tasks list",
+        });
+        return;
+      }
+    }
 
     this._entityId = getTodoLists(this.hass)[0]?.entity_id;
 

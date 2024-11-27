@@ -6869,6 +6869,7 @@
         "create_list": "Create list",
         "delete_list": "Delete list",
         "add_item": "Add item",
+        "add_subtask": "Add subtask",
         "information": "Information",
         "delete_confirm_title": "Remove {name}?",
         "delete_confirm_text": "Are you sure you want to remove this list and all of its items?",
