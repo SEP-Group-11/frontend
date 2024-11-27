@@ -8,6 +8,7 @@ import {
   mdiDrag,
   mdiPlus,
   mdiSort,
+  mdiSubdirectoryArrowRight,
 } from "@mdi/js";
 import { endOfDay, isSameDay } from "date-fns";
 import type { UnsubscribeFunc } from "home-assistant-js-websocket";
@@ -340,11 +341,14 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
           return html`
             <ha-check-list-item
               left
-              .hasMeta=${showReorder || showDelete}
+              .hasMeta=${true}
               class="editRow ${classMap({
                 draggable: item.status === TodoItemStatus.NeedsAction,
                 completed: item.status === TodoItemStatus.Completed,
                 multiline: Boolean(item.description || item.due),
+                subitem:
+                  Boolean(item.parent) &&
+                  item.status === TodoItemStatus.NeedsAction,
               })}"
               .selected=${item.status === TodoItemStatus.Completed}
               .disabled=${unavailable ||
@@ -404,7 +408,29 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
                       @click=${this._deleteItem}
                     >
                     </ha-icon-button>`
-                  : nothing}
+                  : html`<ha-button-menu
+                      @closed=${stopPropagation}
+                      slot="meta"
+                      ?fixed=${true}
+                    >
+                      <ha-icon-button
+                        slot="trigger"
+                        .path=${mdiDotsVertical}
+                      ></ha-icon-button>
+                      <ha-list-item
+                        @click=${this._addSubItem}
+                        graphic="icon"
+                        .itemId=${item.uid}
+                      >
+                        Add sub item
+                        <ha-svg-icon
+                          slot="graphic"
+                          .path=${mdiSubdirectoryArrowRight}
+                          .disabled=${unavailable}
+                        >
+                        </ha-svg-icon>
+                      </ha-list-item>
+                    </ha-button-menu>`}
             </ha-check-list-item>
           `;
         }
@@ -520,6 +546,12 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
 
   private get _newItem(): HaTextField {
     return this.shadowRoot!.querySelector(".addBox") as HaTextField;
+  }
+
+  private _addSubItem(ev): void {
+    ev.stopPropagation();
+    const parentId = ev.currentTarget.itemId;
+    showTodoItemEditDialog(this, { entity: this._entityId!, parent: parentId });
   }
 
   private _addItem(ev): void {
@@ -645,6 +677,10 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
 
       .item {
         margin-top: 8px;
+      }
+
+      .subitem {
+        margin-left: 24px;
       }
 
       ha-check-list-item {

@@ -3,6 +3,7 @@ import type { TodoItem } from "../../data/todo";
 
 export interface TodoItemEditDialogParams {
   entity: string;
+  parent?: string;
   item?: TodoItem;
 }
 
