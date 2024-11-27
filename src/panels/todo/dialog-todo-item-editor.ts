@@ -106,7 +106,7 @@ class DialogTodoItemEditor extends LitElement {
         @closed=${this.closeDialog}
         scrimClickAction
         .heading=${createCloseHeading(
-          this.hass, // TODO: localization
+          this.hass,
           this._params.parent
             ? this.hass.localize("ui.panel.todo.add_subtask")
             : this.hass.localize(

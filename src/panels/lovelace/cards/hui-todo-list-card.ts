@@ -341,7 +341,7 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
           return html`
             <ha-check-list-item
               left
-              .hasMeta=${true /* TODO: replace with correct conditional */}
+              .hasMeta=${true}
               class="editRow ${classMap({
                 draggable: item.status === TodoItemStatus.NeedsAction,
                 completed: item.status === TodoItemStatus.Completed,
@@ -384,29 +384,6 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
                     </div>`
                   : nothing}
               </div>
-              <ha-button-menu
-                @closed=${stopPropagation}
-                slot="meta"
-                ?fixed=${true}
-              >
-                <ha-icon-button
-                  slot="trigger"
-                  .path=${mdiDotsVertical}
-                ></ha-icon-button>
-                <ha-list-item
-                  @click=${this._addSubItem}
-                  graphic="icon"
-                  .itemId=${item.uid}
-                >
-                  Add sub item
-                  <ha-svg-icon
-                    slot="graphic"
-                    .path=${mdiSubdirectoryArrowRight}
-                    .disabled=${unavailable}
-                  >
-                  </ha-svg-icon>
-                </ha-list-item>
-              </ha-button-menu>
               ${showReorder
                 ? html`
                     <ha-svg-icon
@@ -431,7 +408,29 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
                       @click=${this._deleteItem}
                     >
                     </ha-icon-button>`
-                  : nothing}
+                  : html`<ha-button-menu
+                      @closed=${stopPropagation}
+                      slot="meta"
+                      ?fixed=${true}
+                    >
+                      <ha-icon-button
+                        slot="trigger"
+                        .path=${mdiDotsVertical}
+                      ></ha-icon-button>
+                      <ha-list-item
+                        @click=${this._addSubItem}
+                        graphic="icon"
+                        .itemId=${item.uid}
+                      >
+                        Add sub item
+                        <ha-svg-icon
+                          slot="graphic"
+                          .path=${mdiSubdirectoryArrowRight}
+                          .disabled=${unavailable}
+                        >
+                        </ha-svg-icon>
+                      </ha-list-item>
+                    </ha-button-menu>`}
             </ha-check-list-item>
           `;
         }
