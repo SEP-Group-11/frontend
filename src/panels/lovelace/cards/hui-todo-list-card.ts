@@ -617,9 +617,8 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
   private _handleDragStart(e: DragEvent, _item: TodoItem) {
     const itemId = (e.currentTarget as HTMLElement).getAttribute("item-id");
     const draggedItem = this._getItem(itemId!);
+
     if (draggedItem) {
-      // Log the drag start event and item details
-      console.log("Drag start:", draggedItem);
       e.dataTransfer?.setData("text/plain", draggedItem.uid);
       if (e.dataTransfer) {
         e.dataTransfer.effectAllowed = "move";
@@ -630,40 +629,24 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
   }
 
   private _handleDragOver(e: DragEvent) {
-    // Log the drag over event
-    console.log("Drag over");
     e.preventDefault();
     e.dataTransfer!.dropEffect = "move";
   }
 
   private _handleDrop(e: DragEvent) {
-    // Log the drop event and dragged item details
-    console.log("Drop event:", _draggedItem);
     e.preventDefault();
     const uid = e.dataTransfer?.getData("text/plain");
     if (uid && _draggedItem) {
       const panelTodo = document.querySelector("home-assistant")?.shadowRoot?.children[0]?.shadowRoot?.children[0]?.children[1]?.children[0] as any;
       if (panelTodo) {
-        // Log the addition of the item to the target list
-        console.log("Adding item to target list:", uid, this._entityId);
         panelTodo._addItemToTargetList(uid, this._entityId);
-
-        // Log the deletion of the item from the current list
-        console.log(
-          "Deleting item from list:",
-          _draggedItem.uid,
-          this._entityId
-        );
         panelTodo._deleteItemFromList(_draggedItem.uid, _fromList);
-
       } else {
-        // Log if the ha-panel-todo element is not found
         console.error("ha-panel-todo element not found");
       }
     } else {
-      // Log if the uid or globalDraggedItem is null
       console.error(
-        "Drop event: uid or globalDraggedItem is null",
+        "Drop event: uid or _draggedItem is null",
         uid,
         _draggedItem
       );
@@ -674,10 +657,7 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
   }
 
   private _handleDragEnd() {
-    // Log the drag end event
-    console.log("Drag end");
-    // Ensure _draggedItem is set to null after handling the drop event
-    // this._draggedItem = null;
+    // Not implemented for now
   }
 
   static get styles(): CSSResultGroup {

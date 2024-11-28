@@ -470,12 +470,6 @@ class PanelTodo extends LitElement {
   }
 
   public async _addItemToTargetList(uid: string, targetListId: string) {
-    // Log the addition of the item to the target list
-    console.log(
-      "Adding item to target list in ha-panel-todo:",
-      uid,
-      targetListId
-    );
     const item = this._findItemByUid(uid);
     if (item) {
       try {
@@ -486,12 +480,10 @@ class PanelTodo extends LitElement {
         });
         // Fetch the updated tasks
         await this._fetchAllTasks();
-        console.log("Item added to target list:", uid, targetListId);
       } catch (error) {
         console.error("Error adding item to target list:", error);
       }
     } else {
-      // Log if the item is not found
       console.error("Item not found:", uid);
     }
   }
@@ -510,9 +502,6 @@ class PanelTodo extends LitElement {
   }
 
   public async _deleteItemFromList(uid: string, listId: string) {
-    // Log the deletion of the item from the list
-    console.log("Deleting item from list in ha-panel-todo:", uid, listId);
-
     const list = this._allTasks[listId];
     const item = list?.find((task) => task.uid === uid);
 
@@ -521,12 +510,10 @@ class PanelTodo extends LitElement {
         await deleteItems(this.hass, listId, [item.uid]);
         // Fetch the updated tasks
         await this._fetchAllTasks();
-        console.log("Item deleted from list:", uid, listId);
       } catch (error) {
         console.error("Error deleting item from list:", error);
       }
     } else {
-      // Log if the item is not found in the list
       console.error("Item not found in list:", uid, listId);
     }
   }
