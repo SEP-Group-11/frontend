@@ -661,9 +661,9 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
         console.error("ha-panel-todo element not found");
       }
     } else {
-      // Log if the uid or _draggedItem is null
+      // Log if the uid or globalDraggedItem is null
       console.error(
-        "Drop event: uid or _draggedItem is null",
+        "Drop event: uid or globalDraggedItem is null",
         uid,
         _draggedItem
       );
