@@ -2,6 +2,7 @@ import { ResizeController } from "@lit-labs/observers/resize-controller";
 import "@material/mwc-list";
 import {
   mdiChevronDown,
+  mdiChevronUp,
   mdiCommentProcessingOutline,
   mdiDelete,
   mdiDotsVertical,
@@ -10,7 +11,7 @@ import {
 } from "@mdi/js";
 import type { CSSResultGroup, PropertyValues, TemplateResult } from "lit";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, property } from "lit/decorators";
+import { customElement, property, state } from "lit/decorators";
 import memoizeOne from "memoize-one";
 import { isComponentLoaded } from "../../common/config/is_component_loaded";
 import { storage } from "../../common/decorators/storage";
@@ -39,7 +40,9 @@ import {
   TodoListEntityFeature,
   deleteTodoList,
   getTodoLists,
+  fetchItems,
 } from "../../data/todo";
+import type { TodoItem } from "../../data/todo";
 import { showConfigFlowDialog } from "../../dialogs/config-flow/show-dialog-config-flow";
 import {
   showAlertDialog,
@@ -64,6 +67,12 @@ class PanelTodo extends LitElement {
     state: true,
   })
   private _entityId?: string;
+
+  @state() private _expandedLists: Set<string> = new Set();
+
+  @state() private _showAllLists: boolean = false;
+
+  @state() private _allTasks: Record<string, TodoItem[]> = {};
 
   private _headerHeight = 56;
 
@@ -143,6 +152,30 @@ class PanelTodo extends LitElement {
       }) as LovelaceCardConfig
   );
 
+  private async _fetchAllTasks() {
+    const todoLists = getTodoLists(this.hass);
+    const allTasks = await Promise.all(
+      todoLists.map(async (list) => ({
+        entity_id: list.entity_id,
+        tasks: await fetchItems(this.hass, list.entity_id),
+      }))
+    );
+    this._allTasks = allTasks.reduce(
+      (acc, { entity_id, tasks }) => {
+        acc[entity_id] = tasks;
+        return acc;
+      },
+      {} as Record<string, TodoItem[]>
+    );
+  }
+
+  private _toggleShowAllLists() {
+    this._showAllLists = !this._showAllLists;
+    if (this._showAllLists) {
+      this._fetchAllTasks();
+    }
+  }
+
   protected render(): TemplateResult {
     const entityRegistryEntry = this._entityId
       ? this.hass.entities[this._entityId]
@@ -151,10 +184,9 @@ class PanelTodo extends LitElement {
       ? this.hass.states[this._entityId]
       : undefined;
     const showPane = this._showPaneController.value ?? !this.narrow;
-    const lists = getTodoLists(this.hass);
-    const listItems = lists.map(
-      (list) =>
-        html`<ha-list-item
+    const listItems = getTodoLists(this.hass).map(
+      (list) => html`
+        <ha-list-item
           graphic="icon"
           @click=${this._handleEntityPicked}
           .entityId=${list.entity_id}
@@ -164,12 +196,31 @@ class PanelTodo extends LitElement {
             .stateObj=${list}
             .hass=${this.hass}
             slot="graphic"
-          ></ha-state-icon
-          >${list.name}
-        </ha-list-item> `
+          ></ha-state-icon>
+          ${list.name}
+          <ha-icon-button
+            slot="trailingIcon"
+            .path=${this._expandedLists.has(list.entity_id)
+              ? mdiChevronUp
+              : mdiChevronDown}
+            @click=${this._handleToggleList}
+            .entityId=${list.entity_id}
+          ></ha-icon-button>
+        </ha-list-item>
+        ${this._expandedLists.has(list.entity_id)
+          ? html`
+              <div class="tasks">
+                <!-- Render tasks for the list here -->
+              </div>
+            `
+          : nothing}
+      `
     );
     return html`
       <ha-two-pane-top-app-bar-fixed .pane=${showPane} footer>
+        <ha-button slot="actionItems" @click=${this._toggleShowAllLists}>
+          ${this._showAllLists ? "Hide All Lists" : "Show All Lists"}
+        </ha-button>
         <ha-menu-button
           slot="navigationIcon"
           .hass=${this.hass}
@@ -177,53 +228,59 @@ class PanelTodo extends LitElement {
         ></ha-menu-button>
         <div slot="title">
           ${!showPane
-            ? html`<ha-button-menu
-                class="lists"
-                activatable
-                fixed
-                .noAnchor=${this.mobile}
-                .y=${this.mobile
-                  ? this._headerHeight / 2
-                  : this._headerHeight / 4}
-                .x=${this.mobile ? 0 : undefined}
-              >
-                <ha-button slot="trigger">
-                  <div>
-                    ${this._entityId
-                      ? entityState
-                        ? computeStateName(entityState)
-                        : this._entityId
-                      : ""}
-                  </div>
-                  <ha-svg-icon
-                    slot="trailingIcon"
-                    .path=${mdiChevronDown}
-                  ></ha-svg-icon>
-                </ha-button>
-                ${listItems}
-                ${this.hass.user?.is_admin
-                  ? html`<li divider role="separator"></li>
-                      <ha-list-item graphic="icon" @click=${this._addList}>
-                        <ha-svg-icon
-                          .path=${mdiPlus}
-                          slot="graphic"
-                        ></ha-svg-icon>
-                        ${this.hass.localize("ui.panel.todo.create_list")}
-                      </ha-list-item>`
-                  : nothing}
-              </ha-button-menu>`
+            ? html`
+                <ha-button-menu
+                  class="lists"
+                  activatable
+                  fixed
+                  .noAnchor=${this.mobile}
+                  .y=${this.mobile
+                    ? this._headerHeight / 2
+                    : this._headerHeight / 4}
+                  .x=${this.mobile ? 0 : undefined}
+                >
+                  <ha-button slot="trigger">
+                    <div>
+                      ${this._entityId
+                        ? entityState
+                          ? computeStateName(entityState)
+                          : this._entityId
+                        : ""}
+                    </div>
+                    <ha-svg-icon
+                      slot="trailingIcon"
+                      .path=${mdiChevronDown}
+                    ></ha-svg-icon>
+                  </ha-button>
+                  ${listItems}
+                  ${this.hass.user?.is_admin
+                    ? html`
+                        <li divider role="separator"></li>
+                        <ha-list-item graphic="icon" @click=${this._addList}>
+                          <ha-svg-icon
+                            .path=${mdiPlus}
+                            slot="graphic"
+                          ></ha-svg-icon>
+                          ${this.hass.localize("ui.panel.todo.create_list")}
+                        </ha-list-item>
+                      `
+                    : nothing}
+                </ha-button-menu>
+              `
             : this.hass.localize("panel.todo")}
         </div>
         <mwc-list slot="pane" activatable>${listItems}</mwc-list>
         ${showPane && this.hass.user?.is_admin
-          ? html`<ha-list-item
-              graphic="icon"
-              slot="pane-footer"
-              @click=${this._addList}
-            >
-              <ha-svg-icon .path=${mdiPlus} slot="graphic"></ha-svg-icon>
-              ${this.hass.localize("ui.panel.todo.create_list")}
-            </ha-list-item>`
+          ? html`
+              <ha-list-item
+                graphic="icon"
+                slot="pane-footer"
+                @click=${this._addList}
+              >
+                <ha-svg-icon .path=${mdiPlus} slot="graphic"></ha-svg-icon>
+                ${this.hass.localize("ui.panel.todo.create_list")}
+              </ha-list-item>
+            `
           : nothing}
         <ha-button-menu slot="actionItems">
           <ha-icon-button
@@ -232,20 +289,24 @@ class PanelTodo extends LitElement {
             .path=${mdiDotsVertical}
           ></ha-icon-button>
           ${this._conversation(this.hass.config.components)
-            ? html`<ha-list-item
-                graphic="icon"
-                @click=${this._showMoreInfoDialog}
-                .disabled=${!this._entityId}
-              >
-                <ha-svg-icon .path=${mdiInformationOutline} slot="graphic">
-                </ha-svg-icon>
-                ${this.hass.localize("ui.panel.todo.information")}
-              </ha-list-item>`
+            ? html`
+                <ha-list-item
+                  graphic="icon"
+                  @click=${this._showMoreInfoDialog}
+                  .disabled=${!this._entityId}
+                >
+                  <ha-svg-icon .path=${mdiInformationOutline} slot="graphic">
+                  </ha-svg-icon>
+                  ${this.hass.localize("ui.panel.todo.information")}
+                </ha-list-item>
+              `
             : nothing}
           <li divider role="separator"></li>
           <ha-list-item graphic="icon" @click=${this._showVoiceCommandDialog}>
-            <ha-svg-icon .path=${mdiCommentProcessingOutline} slot="graphic">
-            </ha-svg-icon>
+            <ha-svg-icon
+              .path=${mdiCommentProcessingOutline}
+              slot="graphic"
+            ></ha-svg-icon>
             ${this.hass.localize("ui.panel.todo.assist")}
           </ha-list-item>
           ${entityRegistryEntry?.platform === "local_todo" ||
@@ -264,30 +325,54 @@ class PanelTodo extends LitElement {
                   >
                   </ha-svg-icon>
                   ${this.hass.localize("ui.panel.todo.delete_list")}
-                </ha-list-item>`
+                </ha-list-item>
+              `
             : nothing}
         </ha-button-menu>
-        <div id="columns">
-          <div class="column">
-            ${this._entityId
-              ? html`
-                  <hui-card
-                    .hass=${this.hass}
-                    .config=${this._cardConfig(this._entityId)}
-                  ></hui-card>
-                `
-              : nothing}
-          </div>
-        </div>
+        ${!this._showAllLists
+          ? html`
+              <div id="columns">
+                <div class="column">
+                  ${this._entityId
+                    ? html`
+                        <hui-card
+                          .hass=${this.hass}
+                          .config=${this._cardConfig(this._entityId)}
+                        ></hui-card>
+                      `
+                    : nothing}
+                </div>
+              </div>
+            `
+          : nothing}
         ${entityState &&
         supportsFeature(entityState, TodoListEntityFeature.CREATE_TODO_ITEM)
-          ? html`<ha-fab
-              .label=${this.hass.localize("ui.panel.todo.add_item")}
-              extended
-              @click=${this._addItem}
-            >
-              <ha-svg-icon slot="icon" .path=${mdiPlus}></ha-svg-icon>
-            </ha-fab>`
+          ? html`
+              <ha-fab
+                .label=${this.hass.localize("ui.panel.todo.add_item")}
+                extended
+                @click=${this._addItem}
+              >
+                <ha-svg-icon slot="icon" .path=${mdiPlus}></ha-svg-icon>
+              </ha-fab>
+            `
+          : nothing}
+        ${this._showAllLists
+          ? html`
+              <div id="columns">
+                <div class="column all-lists-display">
+                  ${getTodoLists(this.hass).map(
+                    (list) => html`
+                        <div class="list-name">${list.name}</div>
+                        <hui-card
+                          .hass=${this.hass}
+                          .config=${this._cardConfig(list.entity_id)}
+                        ></hui-card>
+                      `
+                    )}
+                </div>
+              </div>
+            `
           : nothing}
       </ha-two-pane-top-app-bar-fixed>
     `;
@@ -295,6 +380,21 @@ class PanelTodo extends LitElement {
 
   private _handleEntityPicked(ev) {
     this._entityId = ev.currentTarget.entityId;
+  }
+
+  private _handleToggleList(ev) {
+    ev.stopPropagation();
+    const entityId = ev.currentTarget.entityId;
+    this._toggleList(entityId);
+  }
+
+  private _toggleList(entityId: string) {
+    if (this._expandedLists.has(entityId)) {
+      this._expandedLists.delete(entityId);
+    } else {
+      this._expandedLists.add(entityId);
+    }
+    this.requestUpdate();
   }
 
   private async _addList(): Promise<void> {
@@ -450,6 +550,25 @@ class PanelTodo extends LitElement {
           bottom: 16px;
           inset-inline-end: 16px;
           inset-inline-start: initial;
+        }
+        .tasks {
+          padding-left: 16px;
+          padding-right: 16px;
+        }
+        .task {
+          padding: 8px;
+          border-bottom: 1px solid var(--divider-color);
+        }
+        .all-lists-display {
+          display: grid;
+          gap: 8px;
+        }
+        .list-name {
+          color: var(--primary-text-color);
+          font-size: 20px;
+          font-weight: 400;
+          padding-bottom: 4px;
+          padding-top: 4px;
         }
       `,
     ];
