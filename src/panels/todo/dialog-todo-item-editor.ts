@@ -107,9 +107,11 @@ class DialogTodoItemEditor extends LitElement {
         scrimClickAction
         .heading=${createCloseHeading(
           this.hass,
-          this.hass.localize(
-            `ui.components.todo.item.${isCreate ? "add" : "edit"}`
-          )
+          this._params.parent
+            ? this.hass.localize("ui.panel.todo.add_subtask")
+            : this.hass.localize(
+                `ui.components.todo.item.${isCreate ? "add" : "edit"}`
+              )
         )}
       >
         <div class="content">
@@ -295,6 +297,7 @@ class DialogTodoItemEditor extends LitElement {
       await createItem(this.hass!, this._params!.entity, {
         summary: this._summary,
         description: this._description,
+        parent: this._params!.parent,
         due: this._due
           ? this._hasTime
             ? this._due.toISOString()
