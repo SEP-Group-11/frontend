@@ -63,6 +63,11 @@ let _fromList: string | undefined;
 type sortDirection = "asc" | "desc";
 type SortKey = Extract<keyof TodoItem, "summary" | "due">;
 
+interface ParentItem {
+  item: TodoItem;
+  children: TodoItem[];
+}
+
 @customElement("hui-todo-list-card")
 export class HuiTodoListCard extends LitElement implements LovelaceCard {
   public static async getConfigElement(): Promise<LovelaceCardEditor> {
@@ -206,27 +211,13 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
         </hui-warning>
       `;
     }
-
-    const filteredItems = this._getFilteredItems(this.todoInput);
-
     const unavailable = isUnavailableState(stateObj.state);
+    const filteredItems = this._getFilteredItemTree(this.todoInput);
+    const sortedItems = this._sortItemTree(filteredItems);
+    const flattenedItems = this._flattenItemTree(sortedItems);
 
-    // sort alphabetically by summary
-    const sortedItems = [...this._items!];
-
-    if (this._sortKey != null) {
-      const sortDueDate = (a: TodoItem | undefined, b: TodoItem | undefined) =>
-        !a.due - !b.due || b.due - a.due;
-      const sortSummary = (a: TodoItem | undefined, b: TodoItem | undefined) =>
-        a?.summary.localeCompare(b.summary);
-      const sortingFn = this._sortKey === "summary" ? sortSummary : sortDueDate;
-      sortedItems.sort((a, b) =>
-        this._sortDirection === "asc" ? sortingFn(a, b) : sortingFn(b, a)
-      );
-    }
-
-    const checkedItems = this._getCheckedItems(sortedItems);
-    const uncheckedItems = this._getUncheckedItems(sortedItems);
+    const checkedItems = this._getCheckedItems(flattenedItems);
+    const uncheckedItems = this._getUncheckedItems(flattenedItems);
 
     let sortMenuIcon = mdiSort;
 
@@ -336,7 +327,7 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
               </ha-svg-icon>
             </ha-list-item>
           </ha-button-menu>
-       </div>
+        </div>
         <ha-sortable
           handle-selector="ha-svg-icon"
           draggable-selector=".draggable"
@@ -467,8 +458,8 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
             >
               <ha-check-list-item
                 left
-                  .hasMeta=${true}
-                  class="editRow ${classMap({
+                .hasMeta=${true}
+                class="editRow ${classMap({
                   draggable: item.status === TodoItemStatus.NeedsAction,
                   completed: item.status === TodoItemStatus.Completed,
                   multiline: Boolean(item.description || item.due),
@@ -537,30 +528,30 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
                       >
                       </ha-icon-button>`
                     : !item.parent
-                    ? html`<ha-button-menu
-                        @closed=${stopPropagation}
-                        slot="meta"
-                        ?fixed=${true}
-                      >
-                        <ha-icon-button
-                          slot="trigger"
-                          .path=${mdiDotsVertical}
-                        ></ha-icon-button>
-                        <ha-list-item
-                          @click=${this._addSubItem}
-                          graphic="icon"
-                          .itemId=${item.uid}
+                      ? html`<ha-button-menu
+                          @closed=${stopPropagation}
+                          slot="meta"
+                          ?fixed=${true}
                         >
-                          Add sub item
-                          <ha-svg-icon
-                            slot="graphic"
-                            .path=${mdiSubdirectoryArrowRight}
-                            .disabled=${unavailable}
+                          <ha-icon-button
+                            slot="trigger"
+                            .path=${mdiDotsVertical}
+                          ></ha-icon-button>
+                          <ha-list-item
+                            @click=${this._addSubItem}
+                            graphic="icon"
+                            .itemId=${item.uid}
                           >
-                          </ha-svg-icon>
-                        </ha-list-item>
-                      </ha-button-menu>`
-                    : nothing}
+                            Add sub item
+                            <ha-svg-icon
+                              slot="graphic"
+                              .path=${mdiSubdirectoryArrowRight}
+                              .disabled=${unavailable}
+                            >
+                            </ha-svg-icon>
+                          </ha-list-item>
+                        </ha-button-menu>`
+                      : nothing}
               </ha-check-list-item>
             </div>
           `;
@@ -710,13 +701,69 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
     }
   }
 
-  private _getFilteredItems(filter?: string): TodoItem[] | undefined {
+  private _getItemTree(): Array<ParentItem> {
+    const result: Array<ParentItem> = [];
+    this._items!.forEach((item) => {
+      const parent = result.find((it) => it.item.uid === item.parent);
+      if (parent) {
+        parent.children.push(item);
+      } else {
+        result.push({ item, children: [] });
+      }
+    });
+    return result;
+  }
+
+  private _getFilteredItemTree(filter?: string): Array<ParentItem> {
+    const itemTree = this._getItemTree();
     if (filter == null || filter.length < 1) {
-      return this._items;
+      return itemTree;
     }
-    return this._items!.filter((item) =>
-      item.summary.toLowerCase().includes(filter.toLowerCase())
+    return itemTree.filter(
+      (it) =>
+        // item.summary.toLowerCase().includes(filter.toLowerCase())
+        it.item.summary.toLowerCase().includes(filter.toLowerCase()) ||
+        it.children.some((child) =>
+          child.summary.toLowerCase().includes(filter.toLowerCase())
+        )
     );
+  }
+
+  private _sortItemTree(itemTree: Array<ParentItem>): Array<ParentItem> {
+    const sortDueDate = (a: TodoItem, b: TodoItem) => {
+      if (!a.due && !b.due) {
+        return 0;
+      }
+      if (!a.due) {
+        return 1;
+      }
+      if (!b.due) {
+        return -1;
+      }
+      const dueA = new Date(a.due!);
+      const dueB = new Date(b.due!);
+      return dueA.getTime() - dueB.getTime();
+    };
+    const sortSummary = (a: TodoItem, b: TodoItem) =>
+      a?.summary.localeCompare(b.summary);
+    if (this._sortKey != null) {
+      const sortingFn = this._sortKey === "summary" ? sortSummary : sortDueDate;
+      itemTree.sort((a, b) =>
+        this._sortDirection === "asc"
+          ? sortingFn(a.item, b.item)
+          : sortingFn(b.item, a.item)
+      );
+      itemTree.forEach((it) => {
+        it.children.sort((a, b) =>
+          this._sortDirection === "asc" ? sortingFn(a, b) : sortingFn(b, a)
+        );
+      });
+    }
+    return itemTree;
+  }
+
+  private _flattenItemTree(itemTree: Array<ParentItem>): Array<TodoItem> {
+    return itemTree.flatMap((it) => [it.item, ...it.children]);
   }
 
   private _deleteItem(ev): void {
@@ -802,7 +849,8 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
     e.preventDefault();
     const uid = e.dataTransfer?.getData("text/plain");
     if (uid && _draggedItem) {
-      const panelTodo = document.querySelector("home-assistant")?.shadowRoot?.children[0]?.shadowRoot?.children[0]?.children[1]?.children[0] as any;
+      const panelTodo = document.querySelector("home-assistant")?.shadowRoot
+        ?.children[0]?.shadowRoot?.children[0]?.children[1]?.children[0] as any;
       if (panelTodo) {
         panelTodo._addItemToTargetList(uid, this._entityId);
         panelTodo._deleteItemFromList(_draggedItem.uid, _fromList);
