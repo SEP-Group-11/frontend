@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { ResizeController } from "@lit-labs/observers/resize-controller";
 import "@material/mwc-list";
 import {
@@ -38,9 +39,11 @@ import { fetchIntegrationManifest } from "../../data/integration";
 import type { LovelaceCardConfig } from "../../data/lovelace/config/card";
 import {
   TodoListEntityFeature,
-  deleteTodoList,
   getTodoLists,
   fetchItems,
+  createItem,
+  deleteItems,
+  deleteTodoList,
 } from "../../data/todo";
 import type { TodoItem } from "../../data/todo";
 import { showConfigFlowDialog } from "../../dialogs/config-flow/show-dialog-config-flow";
@@ -309,6 +312,7 @@ class PanelTodo extends LitElement {
             ></ha-svg-icon>
             ${this.hass.localize("ui.panel.todo.assist")}
           </ha-list-item>
+
           ${entityRegistryEntry?.platform === "local_todo" ||
           entityRegistryEntry?.platform === "google_tasks"
             ? html` <li divider role="separator"></li>
@@ -363,13 +367,13 @@ class PanelTodo extends LitElement {
                 <div class="column all-lists-display">
                   ${getTodoLists(this.hass).map(
                     (list) => html`
-                        <div class="list-name">${list.name}</div>
-                        <hui-card
-                          .hass=${this.hass}
-                          .config=${this._cardConfig(list.entity_id)}
-                        ></hui-card>
-                      `
-                    )}
+                      <div class="list-name">${list.name}</div>
+                      <hui-card
+                        .hass=${this.hass}
+                        .config=${this._cardConfig(list.entity_id)}
+                      ></hui-card>
+                    `
+                  )}
                 </div>
               </div>
             `
@@ -480,6 +484,55 @@ class PanelTodo extends LitElement {
 
   private _addItem() {
     showTodoItemEditDialog(this, { entity: this._entityId! });
+  }
+
+  public async _addItemToTargetList(uid: string, targetListId: string) {
+    const item = this._findItemByUid(uid);
+    if (item) {
+      try {
+        await createItem(this.hass, targetListId, {
+          summary: item.summary,
+          description: item.description || undefined,
+          due: item.due || undefined,
+        });
+        // Fetch the updated tasks
+        await this._fetchAllTasks();
+      } catch (error) {
+        console.error("Error adding item to target list:", error);
+      }
+    } else {
+      console.error("Item not found:", uid);
+    }
+  }
+
+  private _findItemByUid(uid: string): TodoItem | undefined {
+    for (const listId in this._allTasks) {
+      if (Object.prototype.hasOwnProperty.call(this._allTasks, listId)) {
+        const list = this._allTasks[listId];
+        const item = list.find((task) => task.uid === uid);
+        if (item) {
+          return item;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  public async _deleteItemFromList(uid: string, listId: string) {
+    const list = this._allTasks[listId];
+    const item = list?.find((task) => task.uid === uid);
+
+    if (item) {
+      try {
+        await deleteItems(this.hass, listId, [item.uid]);
+        // Fetch the updated tasks
+        await this._fetchAllTasks();
+      } catch (error) {
+        console.error("Error deleting item from list:", error);
+      }
+    } else {
+      console.error("Item not found in list:", uid, listId);
+    }
   }
 
   static get styles(): CSSResultGroup {
