@@ -222,7 +222,9 @@ class PanelTodo extends LitElement {
     return html`
       <ha-two-pane-top-app-bar-fixed .pane=${showPane} footer>
         <ha-button slot="actionItems" @click=${this._toggleShowAllLists}>
-          ${this._showAllLists ? "Hide All Lists" : "Show All Lists"}
+          <span style="color: white"
+            >${this._showAllLists ? "Hide All Lists" : "Show All Lists"}</span
+          >
         </ha-button>
         <ha-menu-button
           slot="navigationIcon"
@@ -315,7 +317,8 @@ class PanelTodo extends LitElement {
 
           ${entityRegistryEntry?.platform === "local_todo" ||
           entityRegistryEntry?.platform === "google_tasks"
-            ? html` <li divider role="separator"></li>
+            ? html`
+                <li divider role="separator"></li>
                 <ha-list-item
                   graphic="icon"
                   @click=${this._deleteList}
