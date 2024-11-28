@@ -53,6 +53,9 @@ import { createEntityNotFoundWarning } from "../components/hui-warning";
 import type { LovelaceCard, LovelaceCardEditor } from "../types";
 import type { TodoListCardConfig } from "./types";
 
+let _draggedItem: TodoItem | null = null;
+let _fromList: string | undefined;
+
 @customElement("hui-todo-list-card")
 export class HuiTodoListCard extends LitElement implements LovelaceCard {
   public static async getConfigElement(): Promise<LovelaceCardEditor> {
@@ -89,8 +92,6 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
   @state() private _reordering = false;
 
   private _unsubItems?: Promise<UnsubscribeFunc>;
-
-  private _draggedItem: TodoItem | null = null;
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -623,7 +624,8 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
       if (e.dataTransfer) {
         e.dataTransfer.effectAllowed = "move";
       }
-      this._draggedItem = draggedItem;
+      _draggedItem = draggedItem;
+      _fromList = this._entityId;
     }
   }
 
@@ -636,22 +638,24 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
 
   private _handleDrop(e: DragEvent) {
     // Log the drop event and dragged item details
-    console.log("Drop event:", this._draggedItem);
+    console.log("Drop event:", _draggedItem);
     e.preventDefault();
     const uid = e.dataTransfer?.getData("text/plain");
-    if (uid && this._draggedItem) {
-      const panelTodo = document.querySelector("ha-panel-todo") as any;
+    if (uid && _draggedItem) {
+      const panelTodo = document.querySelector("home-assistant")?.shadowRoot?.children[0]?.shadowRoot?.children[0]?.children[1]?.children[0] as any;
       if (panelTodo) {
-        // Log the deletion of the item from the current list
-        console.log(
-          "Deleting item from list:",
-          this._draggedItem.uid,
-          this._entityId
-        );
-        panelTodo._deleteItemFromList(this._draggedItem.uid, this._entityId);
         // Log the addition of the item to the target list
         console.log("Adding item to target list:", uid, this._entityId);
         panelTodo._addItemToTargetList(uid, this._entityId);
+
+        // Log the deletion of the item from the current list
+        console.log(
+          "Deleting item from list:",
+          _draggedItem.uid,
+          this._entityId
+        );
+        panelTodo._deleteItemFromList(_draggedItem.uid, _fromList);
+
       } else {
         // Log if the ha-panel-todo element is not found
         console.error("ha-panel-todo element not found");
@@ -661,11 +665,12 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
       console.error(
         "Drop event: uid or _draggedItem is null",
         uid,
-        this._draggedItem
+        _draggedItem
       );
     }
     // Ensure _draggedItem is set to null after handling the drop event
-    this._draggedItem = null;
+    _draggedItem = null;
+    _fromList = undefined;
   }
 
   private _handleDragEnd() {
