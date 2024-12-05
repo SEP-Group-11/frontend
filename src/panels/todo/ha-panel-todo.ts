@@ -7,6 +7,7 @@ import {
   mdiCommentProcessingOutline,
   mdiDelete,
   mdiDotsVertical,
+  mdiFilePdfBox,
   mdiInformationOutline,
   mdiPlus,
 } from "@mdi/js";
@@ -14,6 +15,7 @@ import type { CSSResultGroup, PropertyValues, TemplateResult } from "lit";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators";
 import memoizeOne from "memoize-one";
+import { jsPDF } from "jspdf";
 import { isComponentLoaded } from "../../common/config/is_component_loaded";
 import { storage } from "../../common/decorators/storage";
 import { fireEvent } from "../../common/dom/fire_event";
@@ -88,6 +90,25 @@ class PanelTodo extends LitElement {
   private _conversation = memoizeOne((_components) =>
     isComponentLoaded(this.hass, "conversation")
   );
+
+  private async _downloadPdf() {
+    const list = getTodoLists(this.hass).find(
+      (it) => it.entity_id === this._entityId
+    );
+
+    if (list) {
+      const doc = new jsPDF();
+      let startY = 20;
+      doc.setFontSize(12);
+      const tasks = await fetchItems(this.hass, list.entity_id);
+      doc.text(`${list?.name}`, 10, startY);
+      startY += 10;
+      tasks.forEach((item, index) => {
+        doc.text(`• ${item.summary}`, 20, startY + index * 10);
+      });
+      doc.save(`${list?.name}.pdf`);
+    }
+  }
 
   public connectedCallback() {
     super.connectedCallback();
@@ -335,6 +356,11 @@ class PanelTodo extends LitElement {
                 </ha-list-item>
               `
             : nothing}
+          <li divider role="separator"></li>
+          <ha-list-item graphic="icon" @click=${this._downloadPdf}>
+            <ha-svg-icon .path=${mdiFilePdfBox} slot="graphic"></ha-svg-icon>
+            ${this.hass.localize("ui.panel.todo.export_pdf")}
+          </ha-list-item>
         </ha-button-menu>
         ${!this._showAllLists
           ? html`
