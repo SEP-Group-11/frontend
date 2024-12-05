@@ -95,8 +95,14 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
 
   @property({ attribute: false }) public hass?: HomeAssistant;
 
+  /**
+   * The sorting direction when `_sortKey` is non-null this property can be 'asc' or 'desc'.
+   */
   @state() private _sortDirection: sortDirection = "asc";
 
+  /**
+   * Determines which field of the todo-items are used for sorting.
+   */
   @state() private _sortKey?: SortKey;
 
   @state() private _config?: TodoListCardConfig;
@@ -714,14 +720,20 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
     return result;
   }
 
+  /**
+   * Excludes any todo-item in the tree which does not include the `filter` parameter.
+   * @param filter the search term
+   * @returns the item tree
+   */
   private _getFilteredItemTree(filter?: string): Array<ParentItem> {
     const itemTree = this._getItemTree();
+
     if (filter == null || filter.length < 1) {
       return itemTree;
     }
+
     return itemTree.filter(
       (it) =>
-        // item.summary.toLowerCase().includes(filter.toLowerCase())
         it.item.summary.toLowerCase().includes(filter.toLowerCase()) ||
         it.children.some((child) =>
           child.summary.toLowerCase().includes(filter.toLowerCase())
@@ -729,7 +741,13 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
     );
   }
 
+  /**
+   * Sorts the todo-item tree according to `this._sortKey` and `this._sortDirection` properties.
+   * @param itemTree the tree of todo-items to sort
+   * @returns the sorted tree
+   */
   private _sortItemTree(itemTree: Array<ParentItem>): Array<ParentItem> {
+    // Compares due dates of two todo-items
     const sortDueDate = (a: TodoItem, b: TodoItem) => {
       if (!a.due && !b.due) {
         return 0;
@@ -740,14 +758,19 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
       if (!b.due) {
         return -1;
       }
-      const dueA = new Date(a.due!);
-      const dueB = new Date(b.due!);
+      const dueA = new Date(a.due);
+      const dueB = new Date(b.due);
       return dueA.getTime() - dueB.getTime();
     };
+
+    // Compares summary of two todo-items
     const sortSummary = (a: TodoItem, b: TodoItem) =>
       a?.summary.localeCompare(b.summary);
+
+    // Choose sorting function depending on _sortKey
     if (this._sortKey != null) {
       const sortingFn = this._sortKey === "summary" ? sortSummary : sortDueDate;
+
       itemTree.sort((a, b) =>
         this._sortDirection === "asc"
           ? sortingFn(a.item, b.item)
@@ -759,6 +782,7 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
         );
       });
     }
+
     return itemTree;
   }
 
