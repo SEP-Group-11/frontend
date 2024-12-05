@@ -867,19 +867,50 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
   private _handleDragOver(e: DragEvent) {
     e.preventDefault();
     e.dataTransfer!.dropEffect = "move";
+
+    const target = e.currentTarget as HTMLElement;
+    const bounding = target.getBoundingClientRect();
+    // const offset = bounding.y + bounding.height / 2;
+
+    const placeholder = this.shadowRoot!.querySelector(".drop-placeholder");
+    if (placeholder) {
+      placeholder.remove();
+    }
+
+    const newPlaceholder = document.createElement("div");
+    newPlaceholder.classList.add("drop-placeholder");
+
+    if (e.clientY - bounding.y > bounding.height / 2) {
+      target.insertAdjacentElement("afterend", newPlaceholder);
+    } else {
+      target.insertAdjacentElement("beforebegin", newPlaceholder);
+    }
   }
 
   private _handleDrop(e: DragEvent) {
     e.preventDefault();
     const uid = e.dataTransfer?.getData("text/plain");
     if (uid && _draggedItem) {
-      const panelTodo = document.querySelector("home-assistant")?.shadowRoot
-        ?.children[0]?.shadowRoot?.children[0]?.children[1]?.children[0] as any;
-      if (panelTodo) {
-        panelTodo._addItemToTargetList(uid, this._entityId);
-        panelTodo._deleteItemFromList(_draggedItem.uid, _fromList);
-      } else {
-        console.error("ha-panel-todo element not found");
+      const placeholder = this.shadowRoot!.querySelector(".drop-placeholder");
+      if (placeholder) {
+        const targetList = placeholder.parentElement;
+        const targetIndex = Array.from(targetList!.children).indexOf(
+          placeholder
+        );
+
+        // Remove the placeholder
+        placeholder.remove();
+
+        // Insert the dragged item at the target index
+        const panelTodo = document.querySelector("home-assistant")?.shadowRoot
+          ?.children[0]?.shadowRoot?.children[0]?.children[1]
+          ?.children[0] as any;
+        if (panelTodo) {
+          panelTodo._addItemToTargetList(uid, this._entityId, targetIndex);
+          panelTodo._deleteItemFromList(_draggedItem.uid, _fromList);
+        } else {
+          console.error("ha-panel-todo element not found");
+        }
       }
     } else {
       console.error(
@@ -894,7 +925,11 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
   }
 
   private _handleDragEnd() {
-    // Not implemented for now
+    // Remove the placeholder
+    const placeholder = this.shadowRoot!.querySelector(".drop-placeholder");
+    if (placeholder) {
+      placeholder.remove();
+    }
   }
 
   static get styles(): CSSResultGroup {
@@ -1072,6 +1107,12 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
 
       .warning {
         color: var(--error-color);
+      }
+
+      .drop-placeholder {
+        height: 2px;
+        background-color: var(--primary-color);
+        margin: 4px 0;
       }
     `;
   }

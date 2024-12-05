@@ -489,7 +489,15 @@ class PanelTodo extends LitElement {
     showTodoItemEditDialog(this, { entity: this._entityId! });
   }
 
-  public async _addItemToTargetList(uid: string, targetListId: string) {
+  private _getListById(listId: string): TodoItem[] | undefined {
+    return this._allTasks[listId];
+  }
+
+  public async _addItemToTargetList(
+    uid: string,
+    targetListId: string,
+    index?: number
+  ) {
     const item = this._findItemByUid(uid);
     if (item) {
       try {
@@ -500,6 +508,42 @@ class PanelTodo extends LitElement {
         });
         // Fetch the updated tasks
         await this._fetchAllTasks();
+
+        // Reorder the item if index is provided
+        if (index !== undefined) {
+          const list = this._getListById(targetListId);
+          if (list) {
+            const newItem = list.find(
+              (i) =>
+                i.summary === item.summary && i.description === item.description
+            );
+            if (newItem) {
+              console.log("Before reordering:", list);
+              list.splice(list.indexOf(newItem), 1);
+              list.splice(index, 0, newItem);
+              console.log("After reordering:", list);
+              this.requestUpdate();
+              console.log(
+                "Item added to target list and reordered:",
+                uid,
+                targetListId,
+                index
+              );
+            } else {
+              console.log(
+                "No newitem provided, item added to target list:",
+                uid,
+                targetListId
+              );
+            }
+          }
+        } else {
+          console.log(
+            "No index provided, item added to target list:",
+            uid,
+            targetListId
+          );
+        }
       } catch (error) {
         console.error("Error adding item to target list:", error);
       }
