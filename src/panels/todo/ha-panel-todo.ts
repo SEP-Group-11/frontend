@@ -46,6 +46,7 @@ import {
   createItem,
   deleteItems,
   deleteTodoList,
+  TodoItemStatus,
 } from "../../data/todo";
 import type { TodoItem } from "../../data/todo";
 import { showConfigFlowDialog } from "../../dialogs/config-flow/show-dialog-config-flow";
@@ -104,7 +105,26 @@ class PanelTodo extends LitElement {
       doc.text(`${list?.name}`, 10, startY);
       startY += 10;
       tasks.forEach((item, index) => {
-        doc.text(`• ${item.summary}`, 20, startY + index * 10);
+        let x = 20;
+        if (item.parent) {
+          x += 10;
+        }
+        doc.roundedRect(x, startY + index * 10 - 4, 5, 5, 1, 1);
+        if (item.status === TodoItemStatus.Completed) {
+          const tickStartX = x + 1; // start point of the tick
+          const tickStartY = startY + index * 10 - 4 + 5 / 2;
+
+          const tickMiddleX = x + 2; // middle point of the tick
+          const tickMiddleY = startY + index * 10 - 4 + 5 - 1;
+
+          doc.line(tickStartX, tickStartY, tickMiddleX, tickMiddleY);
+
+          const tickEndX = x + 5 - 1; // end point of the tick
+          const tickEndY = startY + index * 10 - 4 + 1;
+
+          doc.line(tickMiddleX, tickMiddleY, tickEndX, tickEndY);
+        }
+        doc.text(`${item.summary}`, x + 10, startY + index * 10);
       });
       doc.save(`${list?.name}.pdf`);
     }
