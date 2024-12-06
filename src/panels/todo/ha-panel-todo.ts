@@ -59,6 +59,8 @@ import { haStyle } from "../../resources/styles";
 import type { HomeAssistant } from "../../types";
 import "../lovelace/cards/hui-card";
 import { showTodoItemEditDialog } from "./show-dialog-todo-item-editor";
+import { relativeTime } from "../../common/datetime/relative_time";
+import { endOfDay } from "date-fns";
 
 @customElement("ha-panel-todo")
 class PanelTodo extends LitElement {
@@ -104,27 +106,53 @@ class PanelTodo extends LitElement {
       const tasks = await fetchItems(this.hass, list.entity_id);
       doc.text(`${list?.name}`, 10, startY);
       startY += 10;
-      tasks.forEach((item, index) => {
+      let offsetY = startY;
+      tasks.forEach((item) => {
         let x = 20;
         if (item.parent) {
           x += 10;
         }
-        doc.roundedRect(x, startY + index * 10 - 4, 5, 5, 1, 1);
+        offsetY += 10;
+        doc.roundedRect(x, offsetY - 4, 5, 5, 1, 1);
         if (item.status === TodoItemStatus.Completed) {
           const tickStartX = x + 1; // start point of the tick
-          const tickStartY = startY + index * 10 - 4 + 5 / 2;
+          const tickStartY = offsetY - 4 + 5 / 2;
 
           const tickMiddleX = x + 2; // middle point of the tick
-          const tickMiddleY = startY + index * 10 - 4 + 5 - 1;
+          const tickMiddleY = offsetY - 4 + 5 - 1;
 
           doc.line(tickStartX, tickStartY, tickMiddleX, tickMiddleY);
 
           const tickEndX = x + 5 - 1; // end point of the tick
-          const tickEndY = startY + index * 10 - 4 + 1;
+          const tickEndY = offsetY - 4 + 1;
 
           doc.line(tickMiddleX, tickMiddleY, tickEndX, tickEndY);
         }
-        doc.text(`${item.summary}`, x + 10, startY + index * 10);
+        doc.text(`${item.summary}`, x + 10, offsetY);
+        if (item.due) {
+          const due = item.due
+            ? item.due.includes("T")
+              ? new Date(item.due)
+              : endOfDay(new Date(`${item.due}T00:00:00`))
+            : undefined;
+          if (due) {
+            const originFontSize = doc.getFontSize();
+            doc.setFontSize(8);
+            const relTime = relativeTime(due, this.hass.locale);
+            offsetY += 8;
+            doc.text(`Due ${relTime}`, x + 10, offsetY);
+            doc.setFontSize(originFontSize);
+          }
+        }
+        if (item.description) {
+          const originFontSize = doc.getFontSize();
+          doc.setFontSize(8);
+          doc.setTextColor("#808080");
+          offsetY += 8;
+          doc.text(`${item.description}`, x + 10, offsetY);
+          doc.setTextColor("#000000");
+          doc.setFontSize(originFontSize);
+        }
       });
       doc.save(`${list?.name}.pdf`);
     }
