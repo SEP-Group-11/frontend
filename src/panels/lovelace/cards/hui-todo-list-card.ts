@@ -115,6 +115,8 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
 
   @state() private _reordering = false;
 
+  @state() private _showDropZone = false;
+
   private _unsubItems?: Promise<UnsubscribeFunc>;
 
   /* Drag and drop functionality event listeners */
@@ -463,6 +465,17 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
                   ${this._renderItems(checkedItems, unavailable)}
                 `
               : ""}
+            <!-- Add a drop zone at the end of the list -->
+            ${this._showDropZone
+              ? html`
+                  <div
+                    class="todo-item drop-zone"
+                    @dragover=${this._handleDragOver}
+                    @drop=${this._handleDrop}
+                    @dragleave=${this._handleDragLeave}
+                  ></div>
+                `
+              : nothing}
           </mwc-list>
         </ha-sortable>
       </ha-card>
@@ -500,7 +513,7 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
               @dragstart=${(e: DragEvent) => this._handleDragStart(e, item)}
               @dragover=${this._handleDragOver}
               @drop=${this._handleDrop}
-              @dragend=${this._handleDragLeave}
+              @dragleave=${this._handleDragLeave}
             >
               <ha-check-list-item
                 left
@@ -893,6 +906,7 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
   /* Drag and drop functionality */
   // Drag start event to set the data to be transferred
   private _handleDragStart(e: DragEvent, _item: TodoItem) {
+    this._showDropZone = true;
     // Item id is stored in the item-id attribute of the element
     const itemId = (e.currentTarget as HTMLElement).getAttribute("item-id");
     const draggedItem = this._getItem(itemId!);
@@ -905,7 +919,15 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
       }
       _draggedItem = draggedItem;
       _fromList = this._entityId;
+      // Add event listener for dragend to handle the end of the drag operation
+      if (e.currentTarget) {
+        e.currentTarget.addEventListener(
+          "dragend",
+          this._handleDragEnd.bind(this) as EventListener
+        );
+      }
     }
+    console.log("DRAG START");
   }
 
   // Drag over event to allow drop
@@ -924,6 +946,8 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
     // Add the drop-target class to the current target
     const target = e.currentTarget as HTMLElement;
     target.classList.add("drop-target");
+    // this._showDropZone = true;
+    console.log("DRAG OVER");
   }
 
   private async _handleDrop(e: DragEvent) {
@@ -946,9 +970,18 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
       if (panelTodo) {
         // Get the target list id and previous uid
         const targetListId = this._entityId;
-        const previousUid = this._getPreviousUid(
-          e.currentTarget as HTMLElement
-        );
+        // const previousUid = this._getPreviousUid(
+        //   e.currentTarget as HTMLElement
+        // );
+
+        let previousUid: string | undefined;
+        if (target.classList.contains("drop-zone")) {
+          // Dropping at the end of the list
+          const lastItem = this._items?.[this._items.length - 1];
+          previousUid = lastItem?.uid;
+        } else {
+          previousUid = this._getPreviousUid(target);
+        }
         // Add the item to the target list
         const newUid = await panelTodo._addItemToTargetList(
           uid,
@@ -971,6 +1004,8 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
     // Ensure _draggedItem is set to null after handling the drop event
     _draggedItem = null;
     _fromList = undefined;
+    // this._showDropZone = false;
+    console.log("DROP");
   }
 
   // get the uid of the previous item in the list
@@ -985,6 +1020,13 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
   private _handleDragLeave(e: DragEvent) {
     const target = e.currentTarget as HTMLElement;
     target.classList.remove("drop-target");
+    console.log("DRAG LEAVE");
+  }
+
+  // Handle drag end event to hide the drop zone
+  private _handleDragEnd(_e: DragEvent) {
+    this._showDropZone = false;
+    console.log("DRAG END");
   }
 
   static get styles(): CSSResultGroup {
@@ -1163,8 +1205,18 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
       .warning {
         color: var(--error-color);
       }
+
       .drop-target {
         border: 2px dashed var(--primary-color);
+      }
+
+      .drop-zone {
+        height: 50px; /* Adjust as needed */
+        border: 2px dashed transparent;
+      }
+
+      .drop-zone.drop-target {
+        border-color: var(--primary-color);
       }
     `;
   }
