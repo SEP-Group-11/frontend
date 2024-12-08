@@ -156,14 +156,21 @@ class PanelTodo extends LitElement {
       }) as LovelaceCardConfig
   );
 
+  // Asynchronous method that gets all tasks from all todo lists
   private async _fetchAllTasks() {
+    // Get all todo lists
     const todoLists = getTodoLists(this.hass);
+
+    // Gets all tasks from all lists
+    // Map all lists to their corresponding entity_id and associated tasks
     const allTasks = await Promise.all(
       todoLists.map(async (list) => ({
-        entity_id: list.entity_id,
+        entity_id: list.entity_id, // ID of the current todo list
         tasks: await fetchItems(this.hass, list.entity_id),
       }))
     );
+
+    // Converts the array of tasks into records, where the 'entity_id's are the keys
     this._allTasks = allTasks.reduce(
       (acc, { entity_id, tasks }) => {
         acc[entity_id] = tasks;
@@ -173,10 +180,11 @@ class PanelTodo extends LitElement {
     );
   }
 
+  // Toggles whether all lists are shown or not
   private _toggleShowAllLists() {
     this._showAllLists = !this._showAllLists;
     if (this._showAllLists) {
-      this._fetchAllTasks();
+      this._fetchAllTasks(); // Fetches all tasks if all lists are shown
     }
   }
 
