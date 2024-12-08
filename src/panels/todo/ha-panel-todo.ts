@@ -44,6 +44,7 @@ import {
   createItem,
   deleteItems,
   deleteTodoList,
+  moveItem,
 } from "../../data/todo";
 import type { TodoItem } from "../../data/todo";
 import { showConfigFlowDialog } from "../../dialogs/config-flow/show-dialog-config-flow";
@@ -489,72 +490,66 @@ class PanelTodo extends LitElement {
     showTodoItemEditDialog(this, { entity: this._entityId! });
   }
 
-  private _getListById(listId: string): TodoItem[] | undefined {
-    return this._allTasks[listId];
-  }
-
+  /* drag and drop functions */
+  // Add an item to a target list
   public async _addItemToTargetList(
     uid: string,
-    targetListId: string,
-    index?: number
-  ) {
+    targetListId: string
+  ): Promise<string | null> {
+    // Find the item to add
     const item = this._findItemByUid(uid);
+
+    // Check if the item exists
     if (item) {
       try {
+        // Get the list of items before adding the new item
+        const targetListBefore = this._allTasks[targetListId] || [];
+
+        // Create the new item
         await createItem(this.hass, targetListId, {
           summary: item.summary,
           description: item.description || undefined,
           due: item.due || undefined,
         });
+
         // Fetch the updated tasks
         await this._fetchAllTasks();
 
-        // Reorder the item if index is provided
-        if (index !== undefined) {
-          const list = this._getListById(targetListId);
-          if (list) {
-            const newItem = list.find(
-              (i) =>
-                i.summary === item.summary && i.description === item.description
-            );
-            if (newItem) {
-              console.log("Before reordering:", list);
-              list.splice(list.indexOf(newItem), 1);
-              list.splice(index, 0, newItem);
-              console.log("After reordering:", list);
-              this.requestUpdate();
-              console.log(
-                "Item added to target list and reordered:",
-                uid,
-                targetListId,
-                index
-              );
-            } else {
-              console.log(
-                "No newitem provided, item added to target list:",
-                uid,
-                targetListId
-              );
-            }
-          }
+        // Get the list of items after adding the new item
+        const targetListAfter = this._allTasks[targetListId] || [];
+
+        // Find the new item by comparing the lists
+        const newItem = targetListAfter.find(
+          (newTask) =>
+            !targetListBefore.some((oldItem) => oldItem.uid === newTask.uid)
+        );
+
+        // Check if the new item was found
+        if (newItem) {
+          console.log("New item added:", newItem);
+          return newItem.uid; // Return the new UID
+          // eslint-disable-next-line no-else-return
         } else {
-          console.log(
-            "No index provided, item added to target list:",
-            uid,
-            targetListId
-          );
+          console.error("New item not found after adding to target list");
+          return null;
         }
       } catch (error) {
         console.error("Error adding item to target list:", error);
+        return null;
       }
     } else {
       console.error("Item not found:", uid);
+      return null;
     }
   }
 
+  // Find an item by its UID
   private _findItemByUid(uid: string): TodoItem | undefined {
+    // Loop through all lists
     for (const listId in this._allTasks) {
+      // Check if the list has the item
       if (Object.prototype.hasOwnProperty.call(this._allTasks, listId)) {
+        // Find the item in the list and return it
         const list = this._allTasks[listId];
         const item = list.find((task) => task.uid === uid);
         if (item) {
@@ -565,11 +560,15 @@ class PanelTodo extends LitElement {
     return undefined;
   }
 
+  // Delete an item from the list
   public async _deleteItemFromList(uid: string, listId: string) {
+    // Find the item to delete
     const list = this._allTasks[listId];
     const item = list?.find((task) => task.uid === uid);
 
+    // Check if the item exists
     if (item) {
+      // Delete the item
       try {
         await deleteItems(this.hass, listId, [item.uid]);
         // Fetch the updated tasks
@@ -579,6 +578,22 @@ class PanelTodo extends LitElement {
       }
     } else {
       console.error("Item not found in list:", uid, listId);
+    }
+  }
+
+  // Move an item in the list
+  public async moveItemInOrder(
+    uid: string,
+    targetListId: string,
+    previousUid: string | undefined
+  ): Promise<void> {
+    // Move the item in the list
+    try {
+      await moveItem(this.hass, targetListId, uid, previousUid);
+      // Fetch the updated tasks
+      await this._fetchAllTasks();
+    } catch (error) {
+      console.error("Error moving item in order:", error);
     }
   }
 
