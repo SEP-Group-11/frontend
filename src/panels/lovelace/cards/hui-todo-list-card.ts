@@ -911,23 +911,26 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
     this._showDropZone = true;
     // Item id is stored in the item-id attribute of the element
     const itemId = (e.currentTarget as HTMLElement).getAttribute("item-id");
-    const draggedItem = this._getItem(itemId!);
+    if (!itemId) return; // Exit if itemId is null or undefined
+
+    const draggedItem = this._getItem(itemId);
+    if (!draggedItem) return; // Exit if draggedItem is null
 
     // Set the data to be transferred
-    if (draggedItem) {
-      e.dataTransfer?.setData("text/plain", draggedItem.uid);
-      if (e.dataTransfer) {
-        e.dataTransfer.effectAllowed = "move";
-      }
-      _draggedItem = draggedItem;
-      _fromList = this._entityId;
-      // Add event listener for dragend to handle the end of the drag operation
-      if (e.currentTarget) {
-        e.currentTarget.addEventListener(
-          "dragend",
-          this._handleDragEnd.bind(this) as EventListener
-        );
-      }
+    e.dataTransfer?.setData("text/plain", draggedItem.uid);
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "move";
+    }
+
+    _draggedItem = draggedItem;
+    _fromList = this._entityId;
+
+    // Add event listener for dragend to handle the end of the drag operation
+    if (e.currentTarget) {
+      e.currentTarget.addEventListener(
+        "dragend",
+        this._handleDragEnd.bind(this) as EventListener
+      );
     }
     console.log("DRAG START");
   }
@@ -937,7 +940,9 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
     // Prevent default to allow drop
     e.preventDefault();
     // Set the dropEffect to move
-    e.dataTransfer!.dropEffect = "move";
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = "move";
+    }
 
     // Remove the drop-target class from all drop targets
     const dropTargets = this.shadowRoot?.querySelectorAll(".drop-target");
