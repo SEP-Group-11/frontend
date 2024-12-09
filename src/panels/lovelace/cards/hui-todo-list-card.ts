@@ -976,9 +976,6 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
       if (panelTodo) {
         // Get the target list id and previous uid
         const targetListId = this._entityId;
-        // const previousUid = this._getPreviousUid(
-        //   e.currentTarget as HTMLElement
-        // );
 
         let previousUid: string | undefined;
         if (target.classList.contains("drop-zone")) {
