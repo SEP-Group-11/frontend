@@ -542,7 +542,7 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
                     : nothing}
                   ${due
                     ? html`<div
-                        class="due ${due < new Date() ? "overdue" : ""}"
+                        class=${this.getDueClass(due)}
                       >
                         <ha-svg-icon .path=${mdiClock}></ha-svg-icon>${today
                           ? this.hass!.localize(
@@ -611,6 +611,14 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
         }
       )}
     `;
+  }
+
+  // Helper method that determines whether due is overdue
+  private getDueClass(due) {
+    if (due < new Date()) {
+        return "due overdue";
+    }
+    return "due";
   }
 
   private todoListSupportsFeature(feature: number): boolean {
@@ -940,7 +948,6 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
     // Add the drop-target class to the current target
     const target = e.currentTarget as HTMLElement;
     target.classList.add("drop-target");
-    // this._showDropZone = true;
     console.log("DRAG OVER");
   }
 
@@ -998,7 +1005,6 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
     // Ensure _draggedItem is set to null after handling the drop event
     _draggedItem = null;
     _fromList = undefined;
-    // this._showDropZone = false;
     console.log("DROP");
   }
 
