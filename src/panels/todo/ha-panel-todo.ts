@@ -499,7 +499,7 @@ class PanelTodo extends LitElement {
   }
 
   /* drag and drop functions */
-  // Add an item to a target list
+  // Add an item (and its children) to a target list
   public async _addItemToTargetList(
     uid: string,
     targetListId: string
@@ -513,34 +513,50 @@ class PanelTodo extends LitElement {
         // Get the list of items before adding the new item
         const targetListBefore = this._allTasks[targetListId] || [];
 
-        // Create the new item
-        await createItem(this.hass, targetListId, {
-          summary: item.summary,
-          description: item.description || undefined,
-          due: item.due || undefined,
-        });
+        // Recursive helper function to add item and its children
+        const addItemAndChildren = async (
+          currentItem: TodoItem,
+          currentParentUid: string | null
+        ): Promise<string | null> => {
+          // Add the current item to the target list
+          await createItem(this.hass, targetListId, {
+            summary: currentItem.summary,
+            description: currentItem.description || undefined,
+            due: currentItem.due || undefined,
+            parent: currentParentUid || undefined, // Link to the parent in the new list
+          });
 
-        // Fetch the updated tasks
-        await this._fetchAllTasks();
+          // Fetch updated tasks to get the newly added item's UID
+          await this._fetchAllTasks();
 
-        // Get the list of items after adding the new item
-        const targetListAfter = this._allTasks[targetListId] || [];
+          const targetListAfter = this._allTasks[targetListId] || [];
+          const newItem = targetListAfter.find(
+            (newTask) =>
+              !targetListBefore.some((oldItem) => oldItem.uid === newTask.uid) &&
+              newTask.summary === currentItem.summary
+          );
 
-        // Find the new item by comparing the lists
-        const newItem = targetListAfter.find(
-          (newTask) =>
-            !targetListBefore.some((oldItem) => oldItem.uid === newTask.uid)
-        );
+          if (!newItem) {
+            console.error(
+              "Failed to locate the newly added item in the target list:",
+              currentItem
+            );
+            return null;
+          }
 
-        // Check if the new item was found
-        if (newItem) {
-          console.log("New item added:", newItem);
-          return newItem.uid; // Return the new UID
-          // eslint-disable-next-line no-else-return
-        } else {
-          console.error("New item not found after adding to target list");
-          return null;
-        }
+          // Process children concurrently
+          const children = this._getChildrenFromAllTasks(currentItem.uid);
+          const childAdditions = children.map((child) =>
+            addItemAndChildren(child, newItem.uid)
+          );
+
+          await Promise.all(childAdditions); // Wait for all children to be added
+
+          return newItem.uid; // Return the UID of the newly added item
+        };
+
+        // Start by adding the root item
+        return await addItemAndChildren(item, null);
       } catch (error) {
         console.error("Error adding item to target list:", error);
         return null;
@@ -549,6 +565,17 @@ class PanelTodo extends LitElement {
       console.error("Item not found:", uid);
       return null;
     }
+  }
+
+  private _getChildrenFromAllTasks(parentUid: string): TodoItem[] {
+    const children: TodoItem[] = [];
+    for (const listId in this._allTasks) {
+      if (Object.prototype.hasOwnProperty.call(this._allTasks, listId)) {
+        const list = this._allTasks[listId];
+        children.push(...list.filter((item) => item.parent === parentUid));
+      }
+    }
+    return children;
   }
 
   // Find an item by its UID
