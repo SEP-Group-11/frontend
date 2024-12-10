@@ -384,32 +384,6 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
                         "ui.panel.lovelace.cards.todo-list.unchecked_items"
                       )}
                     </h2>
-                    ${this.todoListSupportsFeature(
-                      TodoListEntityFeature.MOVE_TODO_ITEM
-                    )
-                      ? html`<ha-button-menu @closed=${stopPropagation}>
-                          <ha-icon-button
-                            slot="trigger"
-                            .path=${mdiDotsVertical}
-                          ></ha-icon-button>
-                          <ha-list-item
-                            @click=${this._toggleReorder}
-                            graphic="icon"
-                          >
-                            ${this.hass!.localize(
-                              this._reordering
-                                ? "ui.panel.lovelace.cards.todo-list.exit_reorder_items"
-                                : "ui.panel.lovelace.cards.todo-list.reorder_items"
-                            )}
-                            <ha-svg-icon
-                              slot="graphic"
-                              .path=${mdiSort}
-                              .disabled=${unavailable}
-                            >
-                            </ha-svg-icon>
-                          </ha-list-item>
-                        </ha-button-menu>`
-                      : nothing}
                   </div>
                   ${this._renderItems(uncheckedItems, unavailable)}
                 `
