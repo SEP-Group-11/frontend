@@ -5556,6 +5556,7 @@
             "exit_reorder_items": "Exit reorder mode",
             "drag_and_drop": "Drag and drop",
             "delete_item": "Delete item",
+            "add_sub_item": "Add sub item",
             "delete_confirm_title": "Remove completed items?",
             "delete_confirm_text": "{number} {number, plural,\n  one {item}\n  other {items}\n} will be permanently removed from the to-do list."
           },

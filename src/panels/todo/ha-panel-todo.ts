@@ -11,6 +11,7 @@ import {
   mdiInformationOutline,
   mdiPlus,
 } from "@mdi/js";
+import { endOfDay } from "date-fns";
 import type { CSSResultGroup, PropertyValues, TemplateResult } from "lit";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators";
@@ -61,7 +62,6 @@ import type { HomeAssistant } from "../../types";
 import "../lovelace/cards/hui-card";
 import { showTodoItemEditDialog } from "./show-dialog-todo-item-editor";
 import { relativeTime } from "../../common/datetime/relative_time";
-import { endOfDay } from "date-fns";
 
 @customElement("ha-panel-todo")
 class PanelTodo extends LitElement {
@@ -606,8 +606,9 @@ class PanelTodo extends LitElement {
           const targetListAfter = this._allTasks[targetListId] || [];
           const newItem = targetListAfter.find(
             (newTask) =>
-              !targetListBefore.some((oldItem) => oldItem.uid === newTask.uid) &&
-              newTask.summary === currentItem.summary
+              !targetListBefore.some(
+                (oldItem) => oldItem.uid === newTask.uid
+              ) && newTask.summary === currentItem.summary
           );
 
           if (!newItem) {

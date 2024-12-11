@@ -515,9 +515,7 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
                       ></ha-markdown-element>`
                     : nothing}
                   ${due
-                    ? html`<div
-                        class=${this.getDueClass(due)}
-                      >
+                    ? html`<div class=${this.getDueClass(due)}>
                         <ha-svg-icon .path=${mdiClock}></ha-svg-icon>${today
                           ? this.hass!.localize(
                               "ui.panel.lovelace.cards.todo-list.today"
@@ -554,7 +552,10 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
                         @click=${this._deleteItem}
                       >
                       </ha-icon-button>`
-                    : !item.parent
+                    : !item.parent &&
+                        this.todoListSupportsFeature(
+                          TodoListEntityFeature.SET_PARENT_ON_ITEM
+                        )
                       ? html`<ha-button-menu
                           @closed=${stopPropagation}
                           slot="meta"
@@ -590,7 +591,7 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
   // Helper method that determines whether due is overdue
   private getDueClass(due) {
     if (due < new Date()) {
-        return "due overdue";
+      return "due overdue";
     }
     return "due";
   }
@@ -738,7 +739,7 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
 
   private _getItemTree(): Array<ParentItem> {
     const result: Array<ParentItem> = [];
-    this._items!.forEach((item) => {
+    this._items?.forEach((item) => {
       const parent = result.find((it) => it.item.uid === item.parent);
       if (parent) {
         parent.children.push(item);

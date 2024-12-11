@@ -31,6 +31,7 @@ export const enum TodoListEntityFeature {
   SET_DUE_DATE_ON_ITEM = 16,
   SET_DUE_DATETIME_ON_ITEM = 32,
   SET_DESCRIPTION_ON_ITEM = 64,
+  SET_PARENT_ON_ITEM = 128,
 }
 
 export const getTodoLists = (hass: HomeAssistant): TodoList[] =>
