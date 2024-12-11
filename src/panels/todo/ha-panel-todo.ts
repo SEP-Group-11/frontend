@@ -46,6 +46,7 @@ import {
   createItem,
   deleteItems,
   deleteTodoList,
+  moveItem,
   TodoItemStatus,
 } from "../../data/todo";
 import type { TodoItem } from "../../data/todo";
@@ -224,14 +225,21 @@ class PanelTodo extends LitElement {
       }) as LovelaceCardConfig
   );
 
+  // Asynchronous method that gets all tasks from all todo lists
   private async _fetchAllTasks() {
+    // Get all todo lists
     const todoLists = getTodoLists(this.hass);
+
+    // Gets all tasks from all lists
+    // Map all lists to their corresponding entity_id and associated tasks
     const allTasks = await Promise.all(
       todoLists.map(async (list) => ({
-        entity_id: list.entity_id,
+        entity_id: list.entity_id, // ID of the current todo list
         tasks: await fetchItems(this.hass, list.entity_id),
       }))
     );
+
+    // Converts the array of tasks into records, where the 'entity_id's are the keys
     this._allTasks = allTasks.reduce(
       (acc, { entity_id, tasks }) => {
         acc[entity_id] = tasks;
@@ -241,10 +249,11 @@ class PanelTodo extends LitElement {
     );
   }
 
+  // Toggles whether all lists are shown or not
   private _toggleShowAllLists() {
     this._showAllLists = !this._showAllLists;
     if (this._showAllLists) {
-      this._fetchAllTasks();
+      this._fetchAllTasks(); // Fetches all tasks if all lists are shown
     }
   }
 
@@ -563,28 +572,93 @@ class PanelTodo extends LitElement {
     showTodoItemEditDialog(this, { entity: this._entityId! });
   }
 
-  public async _addItemToTargetList(uid: string, targetListId: string) {
+  /* drag and drop functions */
+  // Add an item (and its children) to a target list
+  public async _addItemToTargetList(
+    uid: string,
+    targetListId: string
+  ): Promise<string | null> {
+    // Find the item to add
     const item = this._findItemByUid(uid);
+
+    // Check if the item exists
     if (item) {
       try {
-        await createItem(this.hass, targetListId, {
-          summary: item.summary,
-          description: item.description || undefined,
-          due: item.due || undefined,
-        });
-        // Fetch the updated tasks
-        await this._fetchAllTasks();
+        // Get the list of items before adding the new item
+        const targetListBefore = this._allTasks[targetListId] || [];
+
+        // Recursive helper function to add item and its children
+        const addItemAndChildren = async (
+          currentItem: TodoItem,
+          currentParentUid: string | null
+        ): Promise<string | null> => {
+          // Add the current item to the target list
+          await createItem(this.hass, targetListId, {
+            summary: currentItem.summary,
+            description: currentItem.description || undefined,
+            due: currentItem.due || undefined,
+            parent: currentParentUid || undefined, // Link to the parent in the new list
+          });
+
+          // Fetch updated tasks to get the newly added item's UID
+          await this._fetchAllTasks();
+
+          const targetListAfter = this._allTasks[targetListId] || [];
+          const newItem = targetListAfter.find(
+            (newTask) =>
+              !targetListBefore.some((oldItem) => oldItem.uid === newTask.uid) &&
+              newTask.summary === currentItem.summary
+          );
+
+          if (!newItem) {
+            console.error(
+              "Failed to locate the newly added item in the target list:",
+              currentItem
+            );
+            return null;
+          }
+
+          // Process children concurrently
+          const children = this._getChildrenFromAllTasks(currentItem.uid);
+          const childAdditions = children.map((child) =>
+            addItemAndChildren(child, newItem.uid)
+          );
+
+          await Promise.all(childAdditions); // Wait for all children to be added
+
+          return newItem.uid; // Return the UID of the newly added item
+        };
+
+        // Start by adding the root item
+        return await addItemAndChildren(item, null);
       } catch (error) {
         console.error("Error adding item to target list:", error);
+        return null;
       }
     } else {
       console.error("Item not found:", uid);
+      return null;
     }
   }
 
-  private _findItemByUid(uid: string): TodoItem | undefined {
+  private _getChildrenFromAllTasks(parentUid: string): TodoItem[] {
+    const children: TodoItem[] = [];
     for (const listId in this._allTasks) {
       if (Object.prototype.hasOwnProperty.call(this._allTasks, listId)) {
+        const list = this._allTasks[listId];
+        children.push(...list.filter((item) => item.parent === parentUid));
+      }
+    }
+    return children;
+  }
+
+  // Find an item by its UID
+  private _findItemByUid(uid: string): TodoItem | undefined {
+    // Loop through all lists
+    for (const listId in this._allTasks) {
+      // Check if the list has the item
+      if (Object.prototype.hasOwnProperty.call(this._allTasks, listId)) {
+        // Find the item in the list and return it
         const list = this._allTasks[listId];
         const item = list.find((task) => task.uid === uid);
         if (item) {
@@ -595,11 +669,15 @@ class PanelTodo extends LitElement {
     return undefined;
   }
 
+  // Delete an item from the list
   public async _deleteItemFromList(uid: string, listId: string) {
+    // Find the item to delete
     const list = this._allTasks[listId];
     const item = list?.find((task) => task.uid === uid);
 
+    // Check if the item exists
     if (item) {
+      // Delete the item
       try {
         await deleteItems(this.hass, listId, [item.uid]);
         // Fetch the updated tasks
@@ -609,6 +687,22 @@ class PanelTodo extends LitElement {
       }
     } else {
       console.error("Item not found in list:", uid, listId);
+    }
+  }
+
+  // Move an item in the list
+  public async moveItemInOrder(
+    uid: string,
+    targetListId: string,
+    previousUid: string | undefined
+  ): Promise<void> {
+    // Move the item in the list
+    try {
+      await moveItem(this.hass, targetListId, uid, previousUid);
+      // Fetch the updated tasks
+      await this._fetchAllTasks();
+    } catch (error) {
+      console.error("Error moving item in order:", error);
     }
   }
 

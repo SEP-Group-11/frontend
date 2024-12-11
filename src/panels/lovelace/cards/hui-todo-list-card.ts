@@ -115,19 +115,60 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
 
   @state() private _reordering = false;
 
+  @state() private _showDropZone = false;
+
   private _unsubItems?: Promise<UnsubscribeFunc>;
+
+  /* Drag and drop functionality event listeners */
+  private _addEventListeners() {
+    const dropTargets = this.shadowRoot?.querySelectorAll(".todo-item");
+    dropTargets?.forEach((target) => {
+      target.addEventListener(
+        "dragover",
+        this._handleDragOver.bind(this) as EventListener
+      );
+      target.addEventListener(
+        "dragleave",
+        this._handleDragLeave.bind(this) as EventListener
+      );
+      target.addEventListener(
+        "drop",
+        this._handleDrop.bind(this) as unknown as EventListener
+      );
+    });
+  }
+
+  private _removeEventListeners() {
+    const dropTargets = this.shadowRoot?.querySelectorAll(".todo-item");
+    dropTargets?.forEach((target) => {
+      target.removeEventListener(
+        "dragover",
+        this._handleDragOver.bind(this) as EventListener
+      );
+      target.removeEventListener(
+        "dragleave",
+        this._handleDragLeave.bind(this) as EventListener
+      );
+      target.removeEventListener(
+        "drop",
+        this._handleDrop as unknown as EventListener
+      );
+    });
+  }
 
   connectedCallback(): void {
     super.connectedCallback();
     if (this.hasUpdated) {
       this._subscribeItems();
     }
+    this._addEventListeners();
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
     this._unsubItems?.then((unsub) => unsub());
     this._unsubItems = undefined;
+    this._removeEventListeners();
   }
 
   public getCardSize(): number {
@@ -152,11 +193,6 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
     return undefined;
   }
 
-  protected getEntityIds(): string | undefined {
-    // not implemented, todo list should always have an entity id set;
-    return undefined;
-  }
-
   private _getCheckedItems = memoizeOne((items?: TodoItem[]): TodoItem[] =>
     items
       ? items.filter((item) => item.status === TodoItemStatus.Completed)
@@ -175,7 +211,6 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
     if (!this.hasUpdated) {
       if (!this._entityId) {
         this._entityId = this.getEntityId();
-        this._entityId = this.getEntityIds();
       }
       this._subscribeItems();
     } else if (changedProperties.has("_entityId") || !this._items) {
@@ -349,32 +384,6 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
                         "ui.panel.lovelace.cards.todo-list.unchecked_items"
                       )}
                     </h2>
-                    ${this.todoListSupportsFeature(
-                      TodoListEntityFeature.MOVE_TODO_ITEM
-                    )
-                      ? html`<ha-button-menu @closed=${stopPropagation}>
-                          <ha-icon-button
-                            slot="trigger"
-                            .path=${mdiDotsVertical}
-                          ></ha-icon-button>
-                          <ha-list-item
-                            @click=${this._toggleReorder}
-                            graphic="icon"
-                          >
-                            ${this.hass!.localize(
-                              this._reordering
-                                ? "ui.panel.lovelace.cards.todo-list.exit_reorder_items"
-                                : "ui.panel.lovelace.cards.todo-list.reorder_items"
-                            )}
-                            <ha-svg-icon
-                              slot="graphic"
-                              .path=${mdiSort}
-                              .disabled=${unavailable}
-                            >
-                            </ha-svg-icon>
-                          </ha-list-item>
-                        </ha-button-menu>`
-                      : nothing}
                   </div>
                   ${this._renderItems(uncheckedItems, unavailable)}
                 `
@@ -424,6 +433,17 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
                   ${this._renderItems(checkedItems, unavailable)}
                 `
               : ""}
+            <!-- Add a drop zone at the end of the list -->
+            ${this._showDropZone
+              ? html`
+                  <div
+                    class="todo-item drop-zone"
+                    @dragover=${this._handleDragOver}
+                    @drop=${this._handleDrop}
+                    @dragleave=${this._handleDragLeave}
+                  ></div>
+                `
+              : nothing}
           </mwc-list>
         </ha-sortable>
       </ha-card>
@@ -453,6 +473,7 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
           const today =
             due && !item.due!.includes("T") && isSameDay(new Date(), due);
           return html`
+            <!-- Drag and drop functionality -->
             <div
               class="todo-item"
               item-id=${item.uid}
@@ -460,7 +481,7 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
               @dragstart=${(e: DragEvent) => this._handleDragStart(e, item)}
               @dragover=${this._handleDragOver}
               @drop=${this._handleDrop}
-              @dragend=${this._handleDragEnd}
+              @dragleave=${this._handleDragLeave}
             >
               <ha-check-list-item
                 left
@@ -495,7 +516,7 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
                     : nothing}
                   ${due
                     ? html`<div
-                        class="due ${due < new Date() ? "overdue" : ""}"
+                        class=${this.getDueClass(due)}
                       >
                         <ha-svg-icon .path=${mdiClock}></ha-svg-icon>${today
                           ? this.hass!.localize(
@@ -564,6 +585,14 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
         }
       )}
     `;
+  }
+
+  // Helper method that determines whether due is overdue
+  private getDueClass(due) {
+    if (due < new Date()) {
+        return "due overdue";
+    }
+    return "due";
   }
 
   private todoListSupportsFeature(feature: number): boolean {
@@ -850,34 +879,95 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
     await moveItem(this.hass!, this._entityId!, item.uid, prevItem?.uid);
   }
 
+  /* Drag and drop functionality */
+  // Drag start event to set the data to be transferred
   private _handleDragStart(e: DragEvent, _item: TodoItem) {
+    this._showDropZone = true;
+    // Item id is stored in the item-id attribute of the element
     const itemId = (e.currentTarget as HTMLElement).getAttribute("item-id");
-    const draggedItem = this._getItem(itemId!);
+    if (!itemId) return; // Exit if itemId is null or undefined
 
-    if (draggedItem) {
-      e.dataTransfer?.setData("text/plain", draggedItem.uid);
-      if (e.dataTransfer) {
-        e.dataTransfer.effectAllowed = "move";
-      }
-      _draggedItem = draggedItem;
-      _fromList = this._entityId;
+    const draggedItem = this._getItem(itemId);
+    if (!draggedItem) return; // Exit if draggedItem is null
+
+    // Set the data to be transferred
+    e.dataTransfer?.setData("text/plain", draggedItem.uid);
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "move";
     }
+
+    _draggedItem = draggedItem;
+    _fromList = this._entityId;
+
+    // Add event listener for dragend to handle the end of the drag operation
+    if (e.currentTarget) {
+      e.currentTarget.addEventListener(
+        "dragend",
+        this._handleDragEnd.bind(this) as EventListener
+      );
+    }
+    console.log("DRAG START");
   }
 
+  // Drag over event to allow drop
   private _handleDragOver(e: DragEvent) {
+    // Prevent default to allow drop
     e.preventDefault();
-    e.dataTransfer!.dropEffect = "move";
+    // Set the dropEffect to move
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = "move";
+    }
+
+    // Remove the drop-target class from all drop targets
+    const dropTargets = this.shadowRoot?.querySelectorAll(".drop-target");
+    dropTargets?.forEach((target) => {
+      target.classList.remove("drop-target");
+    });
+
+    // Add the drop-target class to the current target
+    const target = e.currentTarget as HTMLElement;
+    target.classList.add("drop-target");
+    console.log("DRAG OVER");
   }
 
-  private _handleDrop(e: DragEvent) {
+  private async _handleDrop(e: DragEvent) {
+    // Prevent default to allow drop
     e.preventDefault();
+
+    // Remove the drop-target class from all drop targets (visual feedback)
+    const target = e.currentTarget as HTMLElement;
+    target.classList.remove("drop-target");
+
+    // Get the item id from the data transfer
     const uid = e.dataTransfer?.getData("text/plain");
+
+    // Check if the uid and _draggedItem are not null
     if (uid && _draggedItem) {
+      // Get the panel-todo element
       const panelTodo = document.querySelector("home-assistant")?.shadowRoot
         ?.children[0]?.shadowRoot?.children[0]?.children[1]?.children[0] as any;
+      // Check if the panel-todo element is found
       if (panelTodo) {
-        panelTodo._addItemToTargetList(uid, this._entityId);
-        panelTodo._deleteItemFromList(_draggedItem.uid, _fromList);
+        // Get the target list id and previous uid
+        const targetListId = this._entityId;
+
+        let previousUid: string | undefined;
+        if (target.classList.contains("drop-zone")) {
+          // Dropping at the end of the list
+          const lastItem = this._items?.[this._items.length - 1];
+          previousUid = lastItem?.uid;
+        } else {
+          previousUid = this._getPreviousUid(target);
+        }
+        // Add the item to the target list
+        const newUid = await panelTodo._addItemToTargetList(
+          uid,
+          this._entityId
+        );
+        // Move the item to the target with new uid of added item
+        await panelTodo.moveItemInOrder(newUid, targetListId, previousUid);
+        // Delete the item from the source list
+        await panelTodo._deleteItemFromList(_draggedItem.uid, _fromList);
       } else {
         console.error("ha-panel-todo element not found");
       }
@@ -891,10 +981,28 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
     // Ensure _draggedItem is set to null after handling the drop event
     _draggedItem = null;
     _fromList = undefined;
+    console.log("DROP");
   }
 
-  private _handleDragEnd() {
-    // Not implemented for now
+  // get the uid of the previous item in the list
+  private _getPreviousUid(target: HTMLElement): string | undefined {
+    const previousElement = target.previousElementSibling;
+    return previousElement
+      ? (previousElement.getAttribute("item-id") ?? undefined)
+      : undefined;
+  }
+
+  // Handle drag leave event for visual feedback
+  private _handleDragLeave(e: DragEvent) {
+    const target = e.currentTarget as HTMLElement;
+    target.classList.remove("drop-target");
+    console.log("DRAG LEAVE");
+  }
+
+  // Handle drag end event to hide the drop zone
+  private _handleDragEnd(_e: DragEvent) {
+    this._showDropZone = false;
+    console.log("DRAG END");
   }
 
   static get styles(): CSSResultGroup {
@@ -1072,6 +1180,19 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
 
       .warning {
         color: var(--error-color);
+      }
+
+      .drop-target {
+        border: 2px dashed var(--primary-color);
+      }
+
+      .drop-zone {
+        height: 50px; /* Adjust as needed */
+        border: 2px dashed transparent;
+      }
+
+      .drop-zone.drop-target {
+        border-color: var(--primary-color);
       }
     `;
   }
