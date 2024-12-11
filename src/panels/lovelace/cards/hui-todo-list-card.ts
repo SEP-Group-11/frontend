@@ -115,7 +115,7 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
 
   @state() private _reordering = false;
 
-  @state() private _showDropZone = false;
+  // @state() private _showDropZone = false;
 
   private _unsubItems?: Promise<UnsubscribeFunc>;
 
@@ -434,16 +434,12 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
                 `
               : ""}
             <!-- Add a drop zone at the end of the list -->
-            ${this._showDropZone
-              ? html`
-                  <div
-                    class="todo-item drop-zone"
-                    @dragover=${this._handleDragOver}
-                    @drop=${this._handleDrop}
-                    @dragleave=${this._handleDragLeave}
-                  ></div>
-                `
-              : nothing}
+            <div
+              class="todo-item drop-zone"
+              @dragover=${this._handleDragOver}
+              @drop=${this._handleDrop}
+              @dragleave=${this._handleDragLeave}
+            ></div>
           </mwc-list>
         </ha-sortable>
       </ha-card>
@@ -515,9 +511,7 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
                       ></ha-markdown-element>`
                     : nothing}
                   ${due
-                    ? html`<div
-                        class=${this.getDueClass(due)}
-                      >
+                    ? html`<div class=${this.getDueClass(due)}>
                         <ha-svg-icon .path=${mdiClock}></ha-svg-icon>${today
                           ? this.hass!.localize(
                               "ui.panel.lovelace.cards.todo-list.today"
@@ -590,7 +584,7 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
   // Helper method that determines whether due is overdue
   private getDueClass(due) {
     if (due < new Date()) {
-        return "due overdue";
+      return "due overdue";
     }
     return "due";
   }
@@ -882,7 +876,7 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
   /* Drag and drop functionality */
   // Drag start event to set the data to be transferred
   private _handleDragStart(e: DragEvent, _item: TodoItem) {
-    this._showDropZone = true;
+    // this._showDropZone = true;
     // Item id is stored in the item-id attribute of the element
     const itemId = (e.currentTarget as HTMLElement).getAttribute("item-id");
     if (!itemId) return; // Exit if itemId is null or undefined
@@ -1001,7 +995,7 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
 
   // Handle drag end event to hide the drop zone
   private _handleDragEnd(_e: DragEvent) {
-    this._showDropZone = false;
+    // this._showDropZone = false;
     console.log("DRAG END");
   }
 
@@ -1187,7 +1181,7 @@ export class HuiTodoListCard extends LitElement implements LovelaceCard {
       }
 
       .drop-zone {
-        height: 50px; /* Adjust as needed */
+        height: 20px;
         border: 2px dashed transparent;
       }
 
