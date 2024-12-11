@@ -7,6 +7,7 @@ import {
   mdiCommentProcessingOutline,
   mdiDelete,
   mdiDotsVertical,
+  mdiFilePdfBox,
   mdiInformationOutline,
   mdiPlus,
 } from "@mdi/js";
@@ -14,6 +15,7 @@ import type { CSSResultGroup, PropertyValues, TemplateResult } from "lit";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators";
 import memoizeOne from "memoize-one";
+import { jsPDF } from "jspdf";
 import { isComponentLoaded } from "../../common/config/is_component_loaded";
 import { storage } from "../../common/decorators/storage";
 import { fireEvent } from "../../common/dom/fire_event";
@@ -45,6 +47,7 @@ import {
   deleteItems,
   deleteTodoList,
   moveItem,
+  TodoItemStatus,
 } from "../../data/todo";
 import type { TodoItem } from "../../data/todo";
 import { showConfigFlowDialog } from "../../dialogs/config-flow/show-dialog-config-flow";
@@ -57,6 +60,8 @@ import { haStyle } from "../../resources/styles";
 import type { HomeAssistant } from "../../types";
 import "../lovelace/cards/hui-card";
 import { showTodoItemEditDialog } from "./show-dialog-todo-item-editor";
+import { relativeTime } from "../../common/datetime/relative_time";
+import { endOfDay } from "date-fns";
 
 @customElement("ha-panel-todo")
 class PanelTodo extends LitElement {
@@ -89,6 +94,70 @@ class PanelTodo extends LitElement {
   private _conversation = memoizeOne((_components) =>
     isComponentLoaded(this.hass, "conversation")
   );
+
+  private async _downloadPdf() {
+    const list = getTodoLists(this.hass).find(
+      (it) => it.entity_id === this._entityId
+    );
+
+    if (list) {
+      const doc = new jsPDF();
+      let startY = 20;
+      doc.setFontSize(12);
+      const tasks = await fetchItems(this.hass, list.entity_id);
+      doc.text(`${list?.name}`, 10, startY);
+      startY += 10;
+      let offsetY = startY;
+      tasks.forEach((item) => {
+        let x = 20;
+        if (item.parent) {
+          x += 10;
+        }
+        offsetY += 10;
+        doc.roundedRect(x, offsetY - 4, 5, 5, 1, 1);
+        if (item.status === TodoItemStatus.Completed) {
+          const tickStartX = x + 1; // start point of the tick
+          const tickStartY = offsetY - 4 + 5 / 2;
+
+          const tickMiddleX = x + 2; // middle point of the tick
+          const tickMiddleY = offsetY - 4 + 5 - 1;
+
+          doc.line(tickStartX, tickStartY, tickMiddleX, tickMiddleY);
+
+          const tickEndX = x + 5 - 1; // end point of the tick
+          const tickEndY = offsetY - 4 + 1;
+
+          doc.line(tickMiddleX, tickMiddleY, tickEndX, tickEndY);
+        }
+        doc.text(`${item.summary}`, x + 10, offsetY);
+        if (item.due) {
+          const due = item.due
+            ? item.due.includes("T")
+              ? new Date(item.due)
+              : endOfDay(new Date(`${item.due}T00:00:00`))
+            : undefined;
+          if (due) {
+            const originFontSize = doc.getFontSize();
+            doc.setFontSize(8);
+            const relTime = relativeTime(due, this.hass.locale);
+            offsetY += 8;
+            doc.text(`Due ${relTime}`, x + 10, offsetY);
+            doc.setFontSize(originFontSize);
+          }
+        }
+        if (item.description) {
+          const originFontSize = doc.getFontSize();
+          doc.setFontSize(8);
+          doc.setTextColor("#808080");
+          offsetY += 8;
+          doc.text(`${item.description}`, x + 10, offsetY);
+          doc.setTextColor("#000000");
+          doc.setFontSize(originFontSize);
+        }
+      });
+      doc.save(`${list?.name}.pdf`);
+    }
+  }
 
   public connectedCallback() {
     super.connectedCallback();
@@ -344,6 +413,11 @@ class PanelTodo extends LitElement {
                 </ha-list-item>
               `
             : nothing}
+          <li divider role="separator"></li>
+          <ha-list-item graphic="icon" @click=${this._downloadPdf}>
+            <ha-svg-icon .path=${mdiFilePdfBox} slot="graphic"></ha-svg-icon>
+            ${this.hass.localize("ui.panel.todo.export_pdf")}
+          </ha-list-item>
         </ha-button-menu>
         ${!this._showAllLists
           ? html`
